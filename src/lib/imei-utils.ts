@@ -41,9 +41,16 @@ export function lookupDevice(imei: string): string | undefined {
   const tac = imei.slice(0, 8);
   const row = tacCache[tac] as any;
   if (!row) return undefined;
-  const brand = row.brand ?? row.Brand ?? row.manufacturer ?? "";
-  const model = row.model ?? row.Model ?? row.name ?? row.Name ?? "";
-  return [brand, model].filter(Boolean).join(" ").trim() || undefined;
+  const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
+  const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
+  if (!brand && !model) return undefined;
+  if (!brand) return model;
+  if (!model) return brand;
+  // Strip brand prefix from model if duplicated (case-insensitive)
+  const re = new RegExp("^" + brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+", "i");
+  const cleanModel = model.replace(re, "").trim();
+  if (cleanModel.toLowerCase() === brand.toLowerCase()) return brand;
+  return `${brand} ${cleanModel}`.trim();
 }
 
 // Luhn check optional — keep permissive but verify length
