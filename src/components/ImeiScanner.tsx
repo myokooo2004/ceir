@@ -531,8 +531,8 @@ function HistoryView(props: {
                 className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate">Scan {time}</div>
-                  <div className="text-[11px] text-muted-foreground font-mono">{date}</div>
+                  <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono truncate">{h.device ? `${time} · ${date}` : date}</div>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30">
                   {count} IMEIs
