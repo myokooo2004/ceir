@@ -203,7 +203,6 @@ export function ImeiScanner() {
         setStatus("Scanning (OCR)...");
         ocrLoop();
       } else {
-        // @ts-expect-error experimental
         if (!("BarcodeDetector" in window)) {
           throw new Error("BarcodeDetector API not supported in this browser. Use OCR mode.");
         }
