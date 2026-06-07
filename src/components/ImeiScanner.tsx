@@ -253,9 +253,26 @@ export function ImeiScanner() {
   }, [mode]);
 
   const copy = async (text: string) => {
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(text);
-    } catch {}
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+    } catch (e) {
+      console.error("Copy failed", e);
+    }
+    setStatus(ok ? "Copied to clipboard ✓" : "Copy failed");
   };
 
   const copyAll = () => {
@@ -264,6 +281,7 @@ export function ImeiScanner() {
     if (current.imei2) lines.push(`IMEI 2: ${current.imei2}`);
     if (current.device) lines.push(`Device: ${current.device}`);
     if (lines.length) copy(lines.join("\n"));
+    else setStatus("Nothing to copy");
   };
 
   const exportCsv = () => {
