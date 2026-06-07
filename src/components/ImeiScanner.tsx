@@ -293,31 +293,50 @@ export function ImeiScanner() {
       setStatus("No history to export");
       return;
     }
+    const csv = toCsv(history);
+    const filename = `imei-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+
+    // Try native download first
     try {
-      const csv = toCsv(history);
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `imei-history-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.style.display = "none";
+      a.download = filename;
+      a.rel = "noopener";
+      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      }, 100);
-      setStatus("CSV exported ✓");
+      }, 1000);
+      setStatus("CSV exported ✓ (check downloads)");
+      return;
     } catch (e) {
-      console.error("CSV export failed", e);
-      // Fallback: open data URL in new tab
-      try {
-        const csv = toCsv(history);
-        const dataUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-        window.open(dataUrl, "_blank");
-      } catch {
-        setStatus("CSV export failed");
+      console.error("Blob download failed", e);
+    }
+
+    // Fallback: open CSV in a new window so the user can save it manually.
+    // This works inside sandboxed preview iframes that block direct downloads.
+    try {
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.open();
+        w.document.write(
+          `<!doctype html><meta charset="utf-8"><title>${filename}</title>` +
+            `<pre style="font-family:ui-monospace,monospace;white-space:pre;padding:16px">` +
+            csv.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string)) +
+            `</pre>`,
+        );
+        w.document.close();
+        setStatus("CSV opened in new tab — Save As .csv");
+      } else {
+        setStatus("Popup blocked — allow popups");
       }
+    } catch (e) {
+      console.error("CSV fallback failed", e);
+      setStatus("CSV export failed");
     }
   };
 
