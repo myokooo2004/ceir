@@ -43,14 +43,15 @@ export function lookupDevice(imei: string): string | undefined {
   if (!row) return undefined;
   const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
   const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
-  if (!brand && !model) return undefined;
-  if (!brand) return model;
-  if (!model) return brand;
-  // Strip brand prefix from model if duplicated (case-insensitive)
-  const re = new RegExp("^" + brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+", "i");
-  const cleanModel = model.replace(re, "").trim();
-  if (cleanModel.toLowerCase() === brand.toLowerCase()) return brand;
-  return `${brand} ${cleanModel}`.trim();
+  const combined = [brand, model].filter(Boolean).join(" ").trim();
+  if (!combined) return undefined;
+  // Collapse consecutive duplicate words (case-insensitive): "XIAOMI XIAOMI 7A" -> "XIAOMI 7A"
+  const words = combined.split(/\s+/);
+  const out: string[] = [];
+  for (const w of words) {
+    if (!out.length || out[out.length - 1].toLowerCase() !== w.toLowerCase()) out.push(w);
+  }
+  return out.join(" ");
 }
 
 // Luhn check optional — keep permissive but verify length
