@@ -44,7 +44,6 @@ export function ImeiScanner() {
       const raw = localStorage.getItem(HISTORY_KEY);
       if (raw) setHistory(JSON.parse(raw));
     } catch {}
-    // @ts-expect-error - BarcodeDetector is experimental
     if (typeof window !== "undefined" && !("BarcodeDetector" in window)) {
       setBarcodeSupported(false);
     }

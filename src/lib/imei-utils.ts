@@ -39,7 +39,7 @@ export async function loadTacDb() {
 export function lookupDevice(imei: string): string | undefined {
   if (!tacCache) return undefined;
   const tac = imei.slice(0, 8);
-  const row = tacCache[tac];
+  const row = tacCache[tac] as any;
   if (!row) return undefined;
   const brand = row.brand ?? row.Brand ?? row.manufacturer ?? "";
   const model = row.model ?? row.Model ?? row.name ?? row.Name ?? "";
