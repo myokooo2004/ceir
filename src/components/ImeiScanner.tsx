@@ -289,14 +289,36 @@ export function ImeiScanner() {
   };
 
   const exportCsv = () => {
-    const csv = toCsv(history);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `imei-history-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!history.length) {
+      setStatus("No history to export");
+      return;
+    }
+    try {
+      const csv = toCsv(history);
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `imei-history-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+      setStatus("CSV exported ✓");
+    } catch (e) {
+      console.error("CSV export failed", e);
+      // Fallback: open data URL in new tab
+      try {
+        const csv = toCsv(history);
+        const dataUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+        window.open(dataUrl, "_blank");
+      } catch {
+        setStatus("CSV export failed");
+      }
+    }
   };
 
   const clearHistory = () => {
