@@ -14,7 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      device_overrides: {
+        Row: {
+          created_at: string
+          name: string
+          tac: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          tac: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          tac?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
