@@ -346,6 +346,29 @@ export function ImeiScanner() {
     setExpanded(null);
   };
 
+  const addDeviceName = async (imei: string) => {
+    const name = window.prompt("Enter device name (e.g. XIAOMI Redmi 13)")?.trim();
+    if (!name) return;
+    setStatus("Saving device name...");
+    const ok = await saveDeviceOverride(imei, name);
+    if (!ok) {
+      setStatus("Save failed");
+      return;
+    }
+    // Re-lookup all entries that share the same TAC
+    const tac = imei.slice(0, 8);
+    setHistory((h) =>
+      h.map((e) =>
+        e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
+          ? { ...e, device: lookupDevice(e.imei1) ?? e.device }
+          : e,
+      ),
+    );
+    setCurrent((c) => (c.imei1 && c.imei1.slice(0, 8) === tac ? { ...c, device: name } : c));
+    setStatus("Device name saved ✓");
+  };
+
+
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Header */}
