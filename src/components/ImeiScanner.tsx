@@ -5,6 +5,7 @@ import {
   isValidImei,
   loadTacDb,
   lookupDevice,
+  saveDeviceOverride,
   toCsv,
   type DetectedImei,
   type ScannedPair,
