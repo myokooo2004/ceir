@@ -404,7 +404,9 @@ export function ImeiScanner() {
             exportCsv={exportCsv}
             clearHistory={clearHistory}
             copy={copy}
+            addDeviceName={addDeviceName}
           />
+
         )}
       </main>
 
