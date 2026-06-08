@@ -5,6 +5,7 @@ import {
   isValidImei,
   loadTacDb,
   lookupDevice,
+  saveDeviceOverride,
   toCsv,
   type DetectedImei,
   type ScannedPair,
@@ -345,6 +346,29 @@ export function ImeiScanner() {
     setExpanded(null);
   };
 
+  const addDeviceName = async (imei: string) => {
+    const name = window.prompt("Enter device name (e.g. XIAOMI Redmi 13)")?.trim();
+    if (!name) return;
+    setStatus("Saving device name...");
+    const ok = await saveDeviceOverride(imei, name);
+    if (!ok) {
+      setStatus("Save failed");
+      return;
+    }
+    // Re-lookup all entries that share the same TAC
+    const tac = imei.slice(0, 8);
+    setHistory((h) =>
+      h.map((e) =>
+        e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
+          ? { ...e, device: lookupDevice(e.imei1) ?? e.device }
+          : e,
+      ),
+    );
+    setCurrent((c) => (c.imei1 && c.imei1.slice(0, 8) === tac ? { ...c, device: name } : c));
+    setStatus("Device name saved ✓");
+  };
+
+
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Header */}
@@ -380,7 +404,9 @@ export function ImeiScanner() {
             exportCsv={exportCsv}
             clearHistory={clearHistory}
             copy={copy}
+            addDeviceName={addDeviceName}
           />
+
         )}
       </main>
 
@@ -512,8 +538,9 @@ function HistoryView(props: {
   exportCsv: () => void;
   clearHistory: () => void;
   copy: (t: string) => void;
+  addDeviceName: (imei: string) => void | Promise<void>;
 }) {
-  const { history, expanded, setExpanded, exportCsv, clearHistory, copy } = props;
+  const { history, expanded, setExpanded, exportCsv, clearHistory, copy, addDeviceName } = props;
   return (
     <div className="space-y-3 pt-1">
       <div className="flex items-center justify-between">
@@ -545,19 +572,35 @@ function HistoryView(props: {
           const date = `${d.toLocaleString([], { month: "short", day: "2-digit" })}, ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
           return (
             <div key={h.id} className="glass overflow-hidden">
-              <button
-                onClick={() => setExpanded(isOpen ? null : h.id)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
+              <div className="w-full flex items-center justify-between gap-2 px-3 py-2.5">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : h.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="text-sm font-semibold truncate flex items-center gap-1">
+                    {h.device || `Scan ${time}`}
+                  </div>
                   <div className="text-[11px] text-muted-foreground font-mono truncate">{h.device ? `${time} · ${date}` : date}</div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30">
+                </button>
+                {!h.device && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); addDeviceName(h.imei1); }}
+                    title="Add device name"
+                    className="text-[11px] w-6 h-6 rounded-md bg-primary/20 text-primary font-bold border border-primary/40 hover:bg-primary/30 shrink-0"
+                  >
+                    +
+                  </button>
+                )}
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
                   {count} IMEIs
                 </span>
-                <span className={`text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}>⌄</span>
-              </button>
+                <button
+                  onClick={() => setExpanded(isOpen ? null : h.id)}
+                  className={`text-muted-foreground transition-transform shrink-0 ${isOpen ? "rotate-180" : ""}`}
+                >
+                  ⌄
+                </button>
+              </div>
               {isOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
                   {h.imei1 && <SlotRow slot={1} imei={h.imei1} device={h.device} onCopy={() => copy(h.imei1)} />}
@@ -571,6 +614,7 @@ function HistoryView(props: {
     </div>
   );
 }
+
 
 function SlotRow({ slot, imei, device, onCopy }: { slot: 1 | 2; imei: string; device?: string; onCopy: () => void }) {
   return (

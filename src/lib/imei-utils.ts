@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export interface ScannedPair {
   id: string;
   imei1: string;
@@ -13,39 +15,60 @@ export interface DetectedImei {
 
 const TAC_URL = "https://raw.githubusercontent.com/myokooo2004/tac-db/main/tac.json";
 let tacCache: Record<string, { brand?: string; model?: string; name?: string }> | null = null;
+const overrideCache: Record<string, string> = {};
 
 export async function loadTacDb() {
-  if (tacCache) return tacCache;
-  try {
-    const res = await fetch(TAC_URL);
-    const json = await res.json();
-    // normalize: try as object keyed by tac, or array of {tac, brand, model}
-    if (Array.isArray(json)) {
-      const map: Record<string, any> = {};
-      for (const row of json) {
-        const tac = String(row.tac ?? row.TAC ?? row.Tac ?? "").slice(0, 8);
-        if (tac) map[tac] = row;
+  if (!tacCache) {
+    try {
+      const res = await fetch(TAC_URL);
+      const json = await res.json();
+      if (Array.isArray(json)) {
+        const map: Record<string, any> = {};
+        for (const row of json) {
+          const tac = String(row.tac ?? row.TAC ?? row.Tac ?? "").slice(0, 8);
+          if (tac) map[tac] = row;
+        }
+        tacCache = map;
+      } else {
+        tacCache = json as any;
       }
-      tacCache = map;
-    } else {
-      tacCache = json as any;
+    } catch {
+      tacCache = {};
     }
-  } catch {
-    tacCache = {};
   }
+  // Load user-submitted overrides from Lovable Cloud
+  try {
+    const { data } = await (supabase as any).from("device_overrides").select("tac,name");
+    if (data) for (const row of data) overrideCache[row.tac] = row.name;
+  } catch {}
   return tacCache!;
 }
 
+export async function saveDeviceOverride(tac: string, name: string): Promise<boolean> {
+  const cleanTac = tac.slice(0, 8);
+  const cleanName = name.trim().slice(0, 100);
+  if (!/^\d{8}$/.test(cleanTac) || !cleanName) return false;
+  const { error } = await (supabase as any)
+    .from("device_overrides")
+    .insert({ tac: cleanTac, name: cleanName });
+  if (error) {
+    console.error("saveDeviceOverride failed", error);
+    return false;
+  }
+  overrideCache[cleanTac] = cleanName;
+  return true;
+}
+
 export function lookupDevice(imei: string): string | undefined {
-  if (!tacCache) return undefined;
   const tac = imei.slice(0, 8);
+  if (overrideCache[tac]) return overrideCache[tac];
+  if (!tacCache) return undefined;
   const row = tacCache[tac] as any;
   if (!row) return undefined;
   const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
   const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
   const combined = [brand, model].filter(Boolean).join(" ").trim();
   if (!combined) return undefined;
-  // Collapse consecutive duplicate words (case-insensitive): "XIAOMI XIAOMI 7A" -> "XIAOMI 7A"
   const words = combined.split(/\s+/);
   const out: string[] = [];
   for (const w of words) {
