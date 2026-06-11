@@ -22,6 +22,8 @@ interface PendingCounts {
 
 const STABILITY_THRESHOLD = 2;
 const HISTORY_KEY = "imei_scan_history_v1";
+const CLOUD_PASSWORD = "157269";
+const CLOUD_UNLOCK_KEY = "imei_cloud_unlocked_v1";
 
 export function ImeiScanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
