@@ -720,3 +720,71 @@ function ImeiRow({ label, value, onCopy }: { label: string; value: string; onCop
     </div>
   );
 }
+
+function CloudView(props: {
+  history: ScannedPair[];
+  loading: boolean;
+  refresh: () => void;
+  lock: () => void;
+  copy: (t: string) => void;
+}) {
+  const { history, loading, refresh, lock, copy } = props;
+  const [expanded, setExpanded] = useState<string | null>(null);
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">🔐 Shared Database ({history.length})</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground font-semibold disabled:opacity-40"
+          >
+            {loading ? "..." : "Refresh"}
+          </button>
+          <button
+            onClick={lock}
+            className="text-[11px] px-2.5 py-1 rounded-md bg-secondary"
+          >
+            Lock
+          </button>
+        </div>
+      </div>
+      {loading && <p className="text-xs text-muted-foreground text-center py-8">Loading...</p>}
+      {!loading && !history.length && (
+        <p className="text-xs text-muted-foreground text-center py-8">No cloud scans yet.</p>
+      )}
+      <div className="space-y-2">
+        {history.map((h) => {
+          const isOpen = expanded === h.id;
+          const count = (h.imei1 ? 1 : 0) + (h.imei2 ? 1 : 0);
+          const d = new Date(h.date);
+          const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+          const date = d.toLocaleString([], { month: "short", day: "2-digit" });
+          return (
+            <div key={h.id} className="glass overflow-hidden">
+              <button
+                onClick={() => setExpanded(isOpen ? null : h.id)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono truncate">{date} · {time}</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
+                  {count} IMEIs
+                </span>
+              </button>
+              {isOpen && (
+                <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
+                  {h.imei1 && <SlotRow slot={1} imei={h.imei1} device={h.device} onCopy={() => copy(h.imei1)} />}
+                  {h.imei2 && <SlotRow slot={2} imei={h.imei2} device={h.device} onCopy={() => copy(h.imei2!)} />}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
