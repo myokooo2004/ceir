@@ -59,6 +59,38 @@ export async function saveDeviceOverride(tac: string, name: string): Promise<boo
   return true;
 }
 
+export async function saveScanToCloud(pair: ScannedPair): Promise<void> {
+  try {
+    await (supabase as any).from("scan_history").insert({
+      imei1: pair.imei1,
+      imei2: pair.imei2 ?? null,
+      device: pair.device ?? null,
+      created_at: pair.date,
+    });
+  } catch (e) {
+    console.error("saveScanToCloud failed", e);
+  }
+}
+
+export async function fetchCloudHistory(): Promise<ScannedPair[]> {
+  const { data, error } = await (supabase as any)
+    .from("scan_history")
+    .select("id,imei1,imei2,device,created_at")
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.error("fetchCloudHistory failed", error);
+    return [];
+  }
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    imei1: r.imei1,
+    imei2: r.imei2 ?? undefined,
+    device: r.device ?? undefined,
+    date: r.created_at,
+  }));
+}
+
 export function lookupDevice(imei: string): string | undefined {
   const tac = imei.slice(0, 8);
   if (overrideCache[tac]) return overrideCache[tac];

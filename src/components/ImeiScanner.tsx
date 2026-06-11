@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createWorker, type Worker } from "tesseract.js";
 import {
   extractImeisFromText,
+  fetchCloudHistory,
   isValidImei,
   loadTacDb,
   lookupDevice,
   saveDeviceOverride,
+  saveScanToCloud,
   toCsv,
   type DetectedImei,
   type ScannedPair,
 } from "@/lib/imei-utils";
 
 type Mode = "ocr" | "barcode";
-type Tab = "scanner" | "history";
+type Tab = "scanner" | "history" | "cloud";
 
 interface PendingCounts {
   [imei: string]: { count: number; slotHint?: 1 | 2 };
@@ -20,6 +22,8 @@ interface PendingCounts {
 
 const STABILITY_THRESHOLD = 2;
 const HISTORY_KEY = "imei_scan_history_v1";
+const CLOUD_PASSWORD = "157269";
+const CLOUD_UNLOCK_KEY = "imei_cloud_unlocked_v1";
 
 export function ImeiScanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -41,12 +45,18 @@ export function ImeiScanner() {
   const [history, setHistory] = useState<ScannedPair[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [barcodeSupported, setBarcodeSupported] = useState(true);
+  const [cloudUnlocked, setCloudUnlocked] = useState(false);
+  const [cloudHistory, setCloudHistory] = useState<ScannedPair[]>([]);
+  const [cloudLoading, setCloudLoading] = useState(false);
 
   useEffect(() => {
     loadTacDb();
     try {
       const raw = localStorage.getItem(HISTORY_KEY);
       if (raw) setHistory(JSON.parse(raw));
+    } catch {}
+    try {
+      if (localStorage.getItem(CLOUD_UNLOCK_KEY) === "1") setCloudUnlocked(true);
     } catch {}
     if (typeof window !== "undefined" && !("BarcodeDetector" in window)) {
       setBarcodeSupported(false);
@@ -84,6 +94,8 @@ export function ImeiScanner() {
         date: new Date().toISOString(),
       };
       setHistory((h) => [entry, ...h]);
+      // Save to shared cloud database (no auth required)
+      saveScanToCloud(entry);
     }
   }, []);
 
@@ -368,19 +380,63 @@ export function ImeiScanner() {
     setStatus("Device name saved ✓");
   };
 
+  const loadCloud = useCallback(async () => {
+    setCloudLoading(true);
+    const rows = await fetchCloudHistory();
+    setCloudHistory(rows);
+    setCloudLoading(false);
+  }, []);
+
+  const unlockCloud = useCallback(async () => {
+    if (cloudUnlocked) {
+      setTab("cloud");
+      loadCloud();
+      return;
+    }
+    const pw = window.prompt("Enter password to view shared database");
+    if (pw === null) return;
+    if (pw !== CLOUD_PASSWORD) {
+      setStatus("Wrong password");
+      return;
+    }
+    try { localStorage.setItem(CLOUD_UNLOCK_KEY, "1"); } catch {}
+    setCloudUnlocked(true);
+    setTab("cloud");
+    loadCloud();
+  }, [cloudUnlocked, loadCloud]);
+
+  const lockCloud = () => {
+    try { localStorage.removeItem(CLOUD_UNLOCK_KEY); } catch {}
+    setCloudUnlocked(false);
+    setCloudHistory([]);
+    setTab("scanner");
+  };
+
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Header */}
-      <header className="px-4 pt-4 pb-2 text-center shrink-0">
+      <header className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
+        <div className="w-8" />
         <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
           IMEI Scanner
         </h1>
+        <button
+          onClick={unlockCloud}
+          title={cloudUnlocked ? "View shared database" : "Unlock shared database"}
+          className={`w-8 h-8 rounded-md flex items-center justify-center text-base font-bold border transition ${
+            cloudUnlocked
+              ? "bg-primary/20 text-primary border-primary/40"
+              : "bg-secondary text-muted-foreground border-border"
+          }`}
+        >
+          🔑
+        </button>
       </header>
 
       {/* Main content area */}
       <main className="flex-1 overflow-y-auto px-3 pb-3">
-        {tab === "scanner" ? (
+        {tab === "scanner" && (
           <ScannerView
             mode={mode}
             setMode={setMode}
@@ -396,7 +452,8 @@ export function ImeiScanner() {
             copy={copy}
             copyAll={copyAll}
           />
-        ) : (
+        )}
+        {tab === "history" && (
           <HistoryView
             history={history}
             expanded={expanded}
@@ -406,7 +463,15 @@ export function ImeiScanner() {
             copy={copy}
             addDeviceName={addDeviceName}
           />
-
+        )}
+        {tab === "cloud" && (
+          <CloudView
+            history={cloudHistory}
+            loading={cloudLoading}
+            refresh={loadCloud}
+            lock={lockCloud}
+            copy={copy}
+          />
         )}
       </main>
 
@@ -652,6 +717,74 @@ function ImeiRow({ label, value, onCopy }: { label: string; value: string; onCop
       <button onClick={onCopy} className="text-[11px] px-2.5 py-1 rounded-md bg-secondary hover:bg-secondary/80 font-semibold shrink-0">
         Copy
       </button>
+    </div>
+  );
+}
+
+function CloudView(props: {
+  history: ScannedPair[];
+  loading: boolean;
+  refresh: () => void;
+  lock: () => void;
+  copy: (t: string) => void;
+}) {
+  const { history, loading, refresh, lock, copy } = props;
+  const [expanded, setExpanded] = useState<string | null>(null);
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">🔐 Shared Database ({history.length})</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground font-semibold disabled:opacity-40"
+          >
+            {loading ? "..." : "Refresh"}
+          </button>
+          <button
+            onClick={lock}
+            className="text-[11px] px-2.5 py-1 rounded-md bg-secondary"
+          >
+            Lock
+          </button>
+        </div>
+      </div>
+      {loading && <p className="text-xs text-muted-foreground text-center py-8">Loading...</p>}
+      {!loading && !history.length && (
+        <p className="text-xs text-muted-foreground text-center py-8">No cloud scans yet.</p>
+      )}
+      <div className="space-y-2">
+        {history.map((h) => {
+          const isOpen = expanded === h.id;
+          const count = (h.imei1 ? 1 : 0) + (h.imei2 ? 1 : 0);
+          const d = new Date(h.date);
+          const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+          const date = d.toLocaleString([], { month: "short", day: "2-digit" });
+          return (
+            <div key={h.id} className="glass overflow-hidden">
+              <button
+                onClick={() => setExpanded(isOpen ? null : h.id)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono truncate">{date} · {time}</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
+                  {count} IMEIs
+                </span>
+              </button>
+              {isOpen && (
+                <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
+                  {h.imei1 && <SlotRow slot={1} imei={h.imei1} device={h.device} onCopy={() => copy(h.imei1)} />}
+                  {h.imei2 && <SlotRow slot={2} imei={h.imei2} device={h.device} onCopy={() => copy(h.imei2!)} />}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

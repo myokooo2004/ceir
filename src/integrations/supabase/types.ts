@@ -32,6 +32,30 @@ export type Database = {
         }
         Relationships: []
       }
+      scan_history: {
+        Row: {
+          created_at: string
+          device: string | null
+          id: string
+          imei1: string
+          imei2: string | null
+        }
+        Insert: {
+          created_at?: string
+          device?: string | null
+          id?: string
+          imei1: string
+          imei2?: string | null
+        }
+        Update: {
+          created_at?: string
+          device?: string | null
+          id?: string
+          imei1?: string
+          imei2?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
