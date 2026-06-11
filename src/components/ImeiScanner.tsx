@@ -55,6 +55,9 @@ export function ImeiScanner() {
       const raw = localStorage.getItem(HISTORY_KEY);
       if (raw) setHistory(JSON.parse(raw));
     } catch {}
+    try {
+      if (localStorage.getItem(CLOUD_UNLOCK_KEY) === "1") setCloudUnlocked(true);
+    } catch {}
     if (typeof window !== "undefined" && !("BarcodeDetector" in window)) {
       setBarcodeSupported(false);
     }
