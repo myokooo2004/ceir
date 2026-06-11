@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createWorker, type Worker } from "tesseract.js";
 import {
   extractImeisFromText,
+  fetchCloudHistory,
   isValidImei,
   loadTacDb,
   lookupDevice,
   saveDeviceOverride,
+  saveScanToCloud,
   toCsv,
   type DetectedImei,
   type ScannedPair,
 } from "@/lib/imei-utils";
 
 type Mode = "ocr" | "barcode";
-type Tab = "scanner" | "history";
+type Tab = "scanner" | "history" | "cloud";
 
 interface PendingCounts {
   [imei: string]: { count: number; slotHint?: 1 | 2 };
