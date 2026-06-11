@@ -85,21 +85,27 @@ export function isValidImei(s: string): boolean {
 const IMEI_REGEX = /IMEI\s*([12])?\s*[:\-]?\s*(\d{15})/gi;
 
 export function extractImeisFromText(text: string): DetectedImei[] {
+  // Strip out any lines that look like ICCID — we don't want to capture SIM serials.
+  const cleaned = text
+    .split(/\r?\n/)
+    .filter((line) => !/ICCID/i.test(line))
+    .join("\n");
+
   const out: DetectedImei[] = [];
   const seen = new Set<string>();
   let m: RegExpExecArray | null;
   IMEI_REGEX.lastIndex = 0;
-  while ((m = IMEI_REGEX.exec(text)) !== null) {
+  while ((m = IMEI_REGEX.exec(cleaned)) !== null) {
     const v = m[2];
     if (seen.has(v)) continue;
     seen.add(v);
     out.push({ value: v, slotHint: m[1] ? (Number(m[1]) as 1 | 2) : undefined });
   }
-  // fallback: any 15-digit run
+  // fallback: any standalone 15-digit run (word boundary excludes 19–20 digit ICCIDs)
   if (out.length === 0) {
     const re = /\b(\d{15})\b/g;
     let mm;
-    while ((mm = re.exec(text)) !== null) {
+    while ((mm = re.exec(cleaned)) !== null) {
       if (!seen.has(mm[1])) {
         seen.add(mm[1]);
         out.push({ value: mm[1] });
