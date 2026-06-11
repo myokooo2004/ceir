@@ -45,6 +45,9 @@ export function ImeiScanner() {
   const [history, setHistory] = useState<ScannedPair[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [barcodeSupported, setBarcodeSupported] = useState(true);
+  const [cloudUnlocked, setCloudUnlocked] = useState(false);
+  const [cloudHistory, setCloudHistory] = useState<ScannedPair[]>([]);
+  const [cloudLoading, setCloudLoading] = useState(false);
 
   useEffect(() => {
     loadTacDb();
