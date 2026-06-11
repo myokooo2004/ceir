@@ -94,6 +94,8 @@ export function ImeiScanner() {
         date: new Date().toISOString(),
       };
       setHistory((h) => [entry, ...h]);
+      // Save to shared cloud database (no auth required)
+      saveScanToCloud(entry);
     }
   }, []);
 
