@@ -380,6 +380,38 @@ export function ImeiScanner() {
     setStatus("Device name saved ✓");
   };
 
+  const loadCloud = useCallback(async () => {
+    setCloudLoading(true);
+    const rows = await fetchCloudHistory();
+    setCloudHistory(rows);
+    setCloudLoading(false);
+  }, []);
+
+  const unlockCloud = useCallback(async () => {
+    if (cloudUnlocked) {
+      setTab("cloud");
+      loadCloud();
+      return;
+    }
+    const pw = window.prompt("Enter password to view shared database");
+    if (pw === null) return;
+    if (pw !== CLOUD_PASSWORD) {
+      setStatus("Wrong password");
+      return;
+    }
+    try { localStorage.setItem(CLOUD_UNLOCK_KEY, "1"); } catch {}
+    setCloudUnlocked(true);
+    setTab("cloud");
+    loadCloud();
+  }, [cloudUnlocked, loadCloud]);
+
+  const lockCloud = () => {
+    try { localStorage.removeItem(CLOUD_UNLOCK_KEY); } catch {}
+    setCloudUnlocked(false);
+    setCloudHistory([]);
+    setTab("scanner");
+  };
+
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
