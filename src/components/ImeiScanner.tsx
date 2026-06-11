@@ -416,15 +416,27 @@ export function ImeiScanner() {
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Header */}
-      <header className="px-4 pt-4 pb-2 text-center shrink-0">
+      <header className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
+        <div className="w-8" />
         <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
           IMEI Scanner
         </h1>
+        <button
+          onClick={unlockCloud}
+          title={cloudUnlocked ? "View shared database" : "Unlock shared database"}
+          className={`w-8 h-8 rounded-md flex items-center justify-center text-base font-bold border transition ${
+            cloudUnlocked
+              ? "bg-primary/20 text-primary border-primary/40"
+              : "bg-secondary text-muted-foreground border-border"
+          }`}
+        >
+          🔑
+        </button>
       </header>
 
       {/* Main content area */}
       <main className="flex-1 overflow-y-auto px-3 pb-3">
-        {tab === "scanner" ? (
+        {tab === "scanner" && (
           <ScannerView
             mode={mode}
             setMode={setMode}
@@ -440,7 +452,8 @@ export function ImeiScanner() {
             copy={copy}
             copyAll={copyAll}
           />
-        ) : (
+        )}
+        {tab === "history" && (
           <HistoryView
             history={history}
             expanded={expanded}
@@ -450,7 +463,15 @@ export function ImeiScanner() {
             copy={copy}
             addDeviceName={addDeviceName}
           />
-
+        )}
+        {tab === "cloud" && (
+          <CloudView
+            history={cloudHistory}
+            loading={cloudLoading}
+            refresh={loadCloud}
+            lock={lockCloud}
+            copy={copy}
+          />
         )}
       </main>
 
