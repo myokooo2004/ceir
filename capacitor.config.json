@@ -1,0 +1,13 @@
+{
+  "appId": "app.lovable.ceir",
+  "appName": "CEIR IMEI Scanner",
+  "webDir": "www",
+  "server": {
+    "url": "https://ceir.lovable.app",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
