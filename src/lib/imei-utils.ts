@@ -50,12 +50,52 @@ export async function saveDeviceOverride(tac: string, name: string): Promise<boo
   if (!/^\d{8}$/.test(cleanTac) || !cleanName) return false;
   const { error } = await (supabase as any)
     .from("device_overrides")
-    .insert({ tac: cleanTac, name: cleanName });
+    .upsert({ tac: cleanTac, name: cleanName }, { onConflict: "tac" });
   if (error) {
     console.error("saveDeviceOverride failed", error);
     return false;
   }
   overrideCache[cleanTac] = cleanName;
+  return true;
+}
+
+// Record an unknown TAC into the cloud (placeholder name) so it can be renamed later.
+export async function ensureTacRecorded(imei: string): Promise<void> {
+  const tac = imei.slice(0, 8);
+  if (!/^\d{8}$/.test(tac)) return;
+  if (overrideCache[tac]) return;
+  if (tacCache && tacCache[tac]) return;
+  try {
+    const { error } = await (supabase as any)
+      .from("device_overrides")
+      .upsert({ tac, name: "Unknown device" }, { onConflict: "tac", ignoreDuplicates: true });
+    if (!error) overrideCache[tac] = overrideCache[tac] ?? "Unknown device";
+  } catch (e) {
+    console.error("ensureTacRecorded failed", e);
+  }
+}
+
+export async function updateScanDevice(id: string, device: string): Promise<boolean> {
+  const { error } = await (supabase as any)
+    .from("scan_history")
+    .update({ device })
+    .eq("id", id);
+  if (error) {
+    console.error("updateScanDevice failed", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteScan(id: string): Promise<boolean> {
+  const { error } = await (supabase as any)
+    .from("scan_history")
+    .delete()
+    .eq("id", id);
+  if (error) {
+    console.error("deleteScan failed", error);
+    return false;
+  }
   return true;
 }
 

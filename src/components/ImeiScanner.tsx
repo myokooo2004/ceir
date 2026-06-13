@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createWorker, type Worker } from "tesseract.js";
 import {
+  deleteScan,
+  ensureTacRecorded,
   extractImeisFromText,
   fetchCloudHistory,
   isValidImei,
@@ -9,6 +11,7 @@ import {
   saveDeviceOverride,
   saveScanToCloud,
   toCsv,
+  updateScanDevice,
   type DetectedImei,
   type ScannedPair,
 } from "@/lib/imei-utils";
@@ -96,6 +99,9 @@ export function ImeiScanner() {
       setHistory((h) => [entry, ...h]);
       // Save to shared cloud database (no auth required)
       saveScanToCloud(entry);
+      // Record unknown TACs so they can be renamed permanently later
+      ensureTacRecorded(imei1);
+      if (imei2) ensureTacRecorded(imei2);
     }
   }, []);
 
@@ -412,6 +418,38 @@ export function ImeiScanner() {
     setTab("scanner");
   };
 
+  const renameCloudEntry = async (entry: ScannedPair) => {
+    const name = window.prompt("Rename device", entry.device || "")?.trim();
+    if (!name) return;
+    setStatus("Renaming...");
+    // Persist permanently against the TAC (so future scans inherit the name)
+    const tac = entry.imei1.slice(0, 8);
+    const okTac = await saveDeviceOverride(tac, name);
+    // Update this scan row's device name directly
+    const okRow = await updateScanDevice(entry.id, name);
+    if (!okTac && !okRow) { setStatus("Rename failed"); return; }
+    setCloudHistory((rows) => rows.map((r) => (r.id === entry.id ? { ...r, device: name } : r)));
+    // Also reflect in local history when TAC matches
+    setHistory((h) =>
+      h.map((e) =>
+        e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
+          ? { ...e, device: name }
+          : e,
+      ),
+    );
+    setStatus("Renamed ✓");
+  };
+
+  const deleteCloudEntry = async (entry: ScannedPair) => {
+    if (!window.confirm("Delete this scan from the shared database?")) return;
+    setStatus("Deleting...");
+    const ok = await deleteScan(entry.id);
+    if (!ok) { setStatus("Delete failed"); return; }
+    setCloudHistory((rows) => rows.filter((r) => r.id !== entry.id));
+    setStatus("Deleted ✓");
+  };
+
+
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
@@ -471,6 +509,8 @@ export function ImeiScanner() {
             refresh={loadCloud}
             lock={lockCloud}
             copy={copy}
+            onRename={renameCloudEntry}
+            onDelete={deleteCloudEntry}
           />
         )}
       </main>
@@ -727,8 +767,10 @@ function CloudView(props: {
   refresh: () => void;
   lock: () => void;
   copy: (t: string) => void;
+  onRename: (entry: ScannedPair) => void | Promise<void>;
+  onDelete: (entry: ScannedPair) => void | Promise<void>;
 }) {
-  const { history, loading, refresh, lock, copy } = props;
+  const { history, loading, refresh, lock, copy, onRename, onDelete } = props;
   const [expanded, setExpanded] = useState<string | null>(null);
   return (
     <div className="space-y-3 pt-1">
@@ -763,18 +805,32 @@ function CloudView(props: {
           const date = d.toLocaleString([], { month: "short", day: "2-digit" });
           return (
             <div key={h.id} className="glass overflow-hidden">
-              <button
-                onClick={() => setExpanded(isOpen ? null : h.id)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
-              >
-                <div className="min-w-0 flex-1">
+              <div className="w-full flex items-center justify-between gap-2 px-3 py-2.5">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : h.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
                   <div className="text-[11px] text-muted-foreground font-mono truncate">{date} · {time}</div>
-                </div>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRename(h); }}
+                  title="Rename device"
+                  className="text-[11px] w-7 h-7 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 shrink-0"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(h); }}
+                  title="Delete scan"
+                  className="text-[11px] w-7 h-7 rounded-md bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 shrink-0"
+                >
+                  🗑
+                </button>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
-                  {count} IMEIs
+                  {count}
                 </span>
-              </button>
+              </div>
               {isOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
                   {h.imei1 && <SlotRow slot={1} imei={h.imei1} device={h.device} onCopy={() => copy(h.imei1)} />}
