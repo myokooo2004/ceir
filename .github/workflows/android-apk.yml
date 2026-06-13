@@ -53,6 +53,61 @@ jobs:
           fi
           bunx cap sync android
 
+      - name: Add camera + internet permissions to AndroidManifest
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          # Insert permissions just before <application>
+          for PERM in \
+            "android.permission.CAMERA" \
+            "android.permission.INTERNET" \
+            "android.permission.RECORD_AUDIO" \
+            "android.permission.MODIFY_AUDIO_SETTINGS"; do
+            if ! grep -q "$PERM" "$MANIFEST"; then
+              sed -i "s|<application|    <uses-permission android:name=\"$PERM\" />\n    <application|" "$MANIFEST"
+            fi
+          done
+          # Add camera features (optional)
+          if ! grep -q "android.hardware.camera" "$MANIFEST"; then
+            sed -i "s|<application|    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n    <application|" "$MANIFEST"
+          fi
+          cat "$MANIFEST"
+
+      - name: Patch MainActivity to grant WebView camera permission
+        run: |
+          MA=$(find android/app/src/main/java -name "MainActivity.java" | head -n1)
+          cat > "$MA" <<'EOF'
+          package app.lovable.ceir;
+
+          import android.os.Bundle;
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+          import android.webkit.PermissionRequest;
+          import android.webkit.WebChromeClient;
+          import androidx.core.app.ActivityCompat;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  // Request runtime camera permission
+                  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                          != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(this,
+                          new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}, 1);
+                  }
+                  // Grant camera to WebView (getUserMedia)
+                  this.bridge.getWebView().setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest request) {
+                          runOnUiThread(() -> request.grant(request.getResources()));
+                      }
+                  });
+              }
+          }
+          EOF
+          cat "$MA"
+
       - name: Set version code
         run: |
           sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" android/app/build.gradle || true
