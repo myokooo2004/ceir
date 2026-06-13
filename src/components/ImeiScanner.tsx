@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createWorker, type Worker } from "tesseract.js";
 import {
+  deleteScan,
+  ensureTacRecorded,
   extractImeisFromText,
   fetchCloudHistory,
   isValidImei,
@@ -9,6 +11,7 @@ import {
   saveDeviceOverride,
   saveScanToCloud,
   toCsv,
+  updateScanDevice,
   type DetectedImei,
   type ScannedPair,
 } from "@/lib/imei-utils";
