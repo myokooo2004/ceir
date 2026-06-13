@@ -418,6 +418,38 @@ export function ImeiScanner() {
     setTab("scanner");
   };
 
+  const renameCloudEntry = async (entry: ScannedPair) => {
+    const name = window.prompt("Rename device", entry.device || "")?.trim();
+    if (!name) return;
+    setStatus("Renaming...");
+    // Persist permanently against the TAC (so future scans inherit the name)
+    const tac = entry.imei1.slice(0, 8);
+    const okTac = await saveDeviceOverride(tac, name);
+    // Update this scan row's device name directly
+    const okRow = await updateScanDevice(entry.id, name);
+    if (!okTac && !okRow) { setStatus("Rename failed"); return; }
+    setCloudHistory((rows) => rows.map((r) => (r.id === entry.id ? { ...r, device: name } : r)));
+    // Also reflect in local history when TAC matches
+    setHistory((h) =>
+      h.map((e) =>
+        e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
+          ? { ...e, device: name }
+          : e,
+      ),
+    );
+    setStatus("Renamed ✓");
+  };
+
+  const deleteCloudEntry = async (entry: ScannedPair) => {
+    if (!window.confirm("Delete this scan from the shared database?")) return;
+    setStatus("Deleting...");
+    const ok = await deleteScan(entry.id);
+    if (!ok) { setStatus("Delete failed"); return; }
+    setCloudHistory((rows) => rows.filter((r) => r.id !== entry.id));
+    setStatus("Deleted ✓");
+  };
+
+
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
