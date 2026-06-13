@@ -99,6 +99,9 @@ export function ImeiScanner() {
       setHistory((h) => [entry, ...h]);
       // Save to shared cloud database (no auth required)
       saveScanToCloud(entry);
+      // Record unknown TACs so they can be renamed permanently later
+      ensureTacRecorded(imei1);
+      if (imei2) ensureTacRecorded(imei2);
     }
   }, []);
 
