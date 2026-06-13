@@ -414,9 +414,9 @@ export function ImeiScanner() {
 
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background">
+    <div className="fixed inset-0 flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
       {/* Header */}
-      <header className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
+      <header className="px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
         <div className="w-8" />
         <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
           IMEI Scanner
