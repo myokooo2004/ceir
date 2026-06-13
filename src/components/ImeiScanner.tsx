@@ -767,8 +767,10 @@ function CloudView(props: {
   refresh: () => void;
   lock: () => void;
   copy: (t: string) => void;
+  onRename: (entry: ScannedPair) => void | Promise<void>;
+  onDelete: (entry: ScannedPair) => void | Promise<void>;
 }) {
-  const { history, loading, refresh, lock, copy } = props;
+  const { history, loading, refresh, lock, copy, onRename, onDelete } = props;
   const [expanded, setExpanded] = useState<string | null>(null);
   return (
     <div className="space-y-3 pt-1">
@@ -803,18 +805,32 @@ function CloudView(props: {
           const date = d.toLocaleString([], { month: "short", day: "2-digit" });
           return (
             <div key={h.id} className="glass overflow-hidden">
-              <button
-                onClick={() => setExpanded(isOpen ? null : h.id)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
-              >
-                <div className="min-w-0 flex-1">
+              <div className="w-full flex items-center justify-between gap-2 px-3 py-2.5">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : h.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
                   <div className="text-[11px] text-muted-foreground font-mono truncate">{date} · {time}</div>
-                </div>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRename(h); }}
+                  title="Rename device"
+                  className="text-[11px] w-7 h-7 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 shrink-0"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(h); }}
+                  title="Delete scan"
+                  className="text-[11px] w-7 h-7 rounded-md bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 shrink-0"
+                >
+                  🗑
+                </button>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
-                  {count} IMEIs
+                  {count}
                 </span>
-              </button>
+              </div>
               {isOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
                   {h.imei1 && <SlotRow slot={1} imei={h.imei1} device={h.device} onCopy={() => copy(h.imei1)} />}
