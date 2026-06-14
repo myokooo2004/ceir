@@ -537,6 +537,65 @@ export function ImeiScanner() {
           badge={history.length || undefined}
         />
       </nav>
+
+      {pwPromptOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4"
+          onClick={() => setPwPromptOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span aria-hidden className="text-lg">🔑</span>
+              <h2 className="text-base font-bold text-foreground">Cloud history password</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Enter password to view shared cloud-synced history.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitPassword();
+              }}
+            >
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoFocus
+                autoComplete="off"
+                value={pwInput}
+                onChange={(e) => {
+                  setPwInput(e.target.value.replace(/[^0-9]/g, ""));
+                  if (pwError) setPwError("");
+                }}
+                placeholder="Password"
+                className="w-full h-12 px-4 rounded-xl bg-background border border-primary/60 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary text-base tracking-widest"
+              />
+              {pwError && (
+                <p className="mt-2 text-xs text-destructive">{pwError}</p>
+              )}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPwPromptOpen(false)}
+                  className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
