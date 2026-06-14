@@ -51,6 +51,9 @@ export function ImeiScanner() {
   const [cloudUnlocked, setCloudUnlocked] = useState(false);
   const [cloudHistory, setCloudHistory] = useState<ScannedPair[]>([]);
   const [cloudLoading, setCloudLoading] = useState(false);
+  const [pwPromptOpen, setPwPromptOpen] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState("");
 
   useEffect(() => {
     loadTacDb();
