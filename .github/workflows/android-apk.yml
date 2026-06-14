@@ -148,17 +148,17 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/ceir-imei-scanner.apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist/imei-scanner.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ceir-imei-scanner-apk
-          path: dist/ceir-imei-scanner.apk
+          name: imei-scanner-apk
+          path: dist/imei-scanner.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: CEIR IMEI Scanner v1.0.${{ github.run_number }}
-          files: dist/ceir-imei-scanner.apk
+          name: IMEI SCANNER v1.0.${{ github.run_number }}
+          files: dist/imei-scanner.apk
           generate_release_notes: true
