@@ -465,21 +465,22 @@ export function ImeiScanner() {
     <div className="fixed inset-0 flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
       {/* Header */}
       <header className="px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
-        <div className="w-8" />
-        <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          IMEI Scanner
-        </h1>
         <button
           onClick={unlockCloud}
           title={cloudUnlocked ? "View shared database" : "Unlock shared database"}
-          className={`w-8 h-8 rounded-md flex items-center justify-center text-base font-bold border transition ${
+          className={`px-3 h-8 rounded-full flex items-center gap-1.5 text-xs font-bold border transition ${
             cloudUnlocked
               ? "bg-primary/20 text-primary border-primary/40"
               : "bg-secondary text-muted-foreground border-border"
           }`}
         >
-          🔑
+          <span aria-hidden>🔑</span>
+          <span>KEY</span>
         </button>
+        <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          IMEI Scanner
+        </h1>
+        <div className="w-[64px]" />
       </header>
 
       {/* Main content area */}
