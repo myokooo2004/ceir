@@ -1,6 +1,6 @@
 {
   "appId": "app.lovable.ceir",
-  "appName": "CEIR IMEI Scanner",
+  "appName": "IMEI SCANNER",
   "webDir": "www",
   "server": {
     "url": "https://ceir.lovable.app",

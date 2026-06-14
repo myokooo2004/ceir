@@ -638,22 +638,19 @@ function ScannerView(props: {
         </button>
       </div>
 
-      <div className="glass relative overflow-hidden aspect-[4/3]">
+      <div className="relative overflow-hidden aspect-[16/10] rounded-2xl bg-black border border-white/10">
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
-        {!scanning && (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
-            Camera preview
-          </div>
-        )}
+        <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-[42%] border-2 border-white/80 rounded-2xl pointer-events-none flex items-center justify-center">
+          {!scanning && (
+            <span className="text-white/70 text-base font-medium">Camera off</span>
+          )}
+        </div>
         {scanning && (
-          <>
-            <div className="absolute top-2 left-2 flex items-center gap-1.5 glass px-2 py-1">
-              <span className="size-2 rounded-full bg-[oklch(0.75_0.2_145)] glow-pulse" />
-              <span className="text-[10px] font-semibold">LIVE</span>
-            </div>
-            <div className="absolute inset-x-6 top-1/4 bottom-1/4 border-2 border-primary/60 rounded-lg pointer-events-none" />
-          </>
+          <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/50 backdrop-blur px-2 py-1 rounded-md">
+            <span className="size-2 rounded-full bg-[oklch(0.75_0.2_145)] glow-pulse" />
+            <span className="text-[10px] font-semibold text-white">LIVE</span>
+          </div>
         )}
       </div>
 
