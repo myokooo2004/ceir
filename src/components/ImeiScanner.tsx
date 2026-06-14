@@ -25,7 +25,39 @@ interface PendingCounts {
 
 const STABILITY_THRESHOLD = 2;
 const HISTORY_KEY = "imei_scan_history_v1";
-const CLOUD_PASSWORD = "157269";
+// Password is never stored in plaintext in the bundle. We compare a salted,
+// 150k-iteration SHA-256 chain. Extracting the APK only reveals the hash —
+// not the password — and brute-forcing is intentionally slow.
+const _S = ["im", "ei-", "sca", "nner", "-v1-", "aB7", "xQ9", "pK"].join("");
+const _H = [
+  "b3860fe6", "236c384e", "a9b46494", "d714896a",
+  "f91f4076", "f73bc8af", "dbed3b51", "198686ed",
+].join("");
+async function _verifyCloudPass(input: string): Promise<boolean> {
+  try {
+    const enc = new TextEncoder();
+    const subtle = (globalThis.crypto || (window as any).crypto)?.subtle;
+    if (!subtle) return false;
+    let buf = await subtle.digest("SHA-256", enc.encode(_S + ":" + input));
+    const saltBytes = enc.encode(_S);
+    for (let i = 0; i < 150000; i++) {
+      const combined = new Uint8Array(buf.byteLength + saltBytes.byteLength);
+      combined.set(new Uint8Array(buf), 0);
+      combined.set(saltBytes, buf.byteLength);
+      buf = await subtle.digest("SHA-256", combined);
+    }
+    const hex = Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    // constant-time compare
+    if (hex.length !== _H.length) return false;
+    let diff = 0;
+    for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ _H.charCodeAt(i);
+    return diff === 0;
+  } catch {
+    return false;
+  }
+}
 const CLOUD_UNLOCK_KEY = "imei_cloud_unlocked_v1";
 
 export function ImeiScanner() {
