@@ -439,8 +439,9 @@ export function ImeiScanner() {
     setPwPromptOpen(true);
   }, [cloudUnlocked, loadCloud]);
 
-  const submitPassword = useCallback(() => {
-    if (pwInput !== CLOUD_PASSWORD) {
+  const submitPassword = useCallback(async () => {
+    const ok = await _verifyCloudPass(pwInput);
+    if (!ok) {
       setPwError("Wrong password");
       return;
     }
