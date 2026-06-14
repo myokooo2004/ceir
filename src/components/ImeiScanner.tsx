@@ -402,17 +402,24 @@ export function ImeiScanner() {
       loadCloud();
       return;
     }
-    const pw = window.prompt("Enter password to view shared database");
-    if (pw === null) return;
-    if (pw !== CLOUD_PASSWORD) {
-      setStatus("Wrong password");
+    setPwInput("");
+    setPwError("");
+    setPwPromptOpen(true);
+  }, [cloudUnlocked, loadCloud]);
+
+  const submitPassword = useCallback(() => {
+    if (pwInput !== CLOUD_PASSWORD) {
+      setPwError("Wrong password");
       return;
     }
     try { localStorage.setItem(CLOUD_UNLOCK_KEY, "1"); } catch {}
     setCloudUnlocked(true);
+    setPwPromptOpen(false);
+    setPwInput("");
+    setPwError("");
     setTab("cloud");
     loadCloud();
-  }, [cloudUnlocked, loadCloud]);
+  }, [pwInput, loadCloud]);
 
   const lockCloud = () => {
     try { localStorage.removeItem(CLOUD_UNLOCK_KEY); } catch {}
