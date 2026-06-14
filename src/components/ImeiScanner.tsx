@@ -51,6 +51,9 @@ export function ImeiScanner() {
   const [cloudUnlocked, setCloudUnlocked] = useState(false);
   const [cloudHistory, setCloudHistory] = useState<ScannedPair[]>([]);
   const [cloudLoading, setCloudLoading] = useState(false);
+  const [pwPromptOpen, setPwPromptOpen] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState("");
 
   useEffect(() => {
     loadTacDb();
@@ -399,17 +402,24 @@ export function ImeiScanner() {
       loadCloud();
       return;
     }
-    const pw = window.prompt("Enter password to view shared database");
-    if (pw === null) return;
-    if (pw !== CLOUD_PASSWORD) {
-      setStatus("Wrong password");
+    setPwInput("");
+    setPwError("");
+    setPwPromptOpen(true);
+  }, [cloudUnlocked, loadCloud]);
+
+  const submitPassword = useCallback(() => {
+    if (pwInput !== CLOUD_PASSWORD) {
+      setPwError("Wrong password");
       return;
     }
     try { localStorage.setItem(CLOUD_UNLOCK_KEY, "1"); } catch {}
     setCloudUnlocked(true);
+    setPwPromptOpen(false);
+    setPwInput("");
+    setPwError("");
     setTab("cloud");
     loadCloud();
-  }, [cloudUnlocked, loadCloud]);
+  }, [pwInput, loadCloud]);
 
   const lockCloud = () => {
     try { localStorage.removeItem(CLOUD_UNLOCK_KEY); } catch {}
@@ -455,21 +465,22 @@ export function ImeiScanner() {
     <div className="fixed inset-0 flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
       {/* Header */}
       <header className="px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
-        <div className="w-8" />
-        <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          IMEI Scanner
-        </h1>
         <button
           onClick={unlockCloud}
           title={cloudUnlocked ? "View shared database" : "Unlock shared database"}
-          className={`w-8 h-8 rounded-md flex items-center justify-center text-base font-bold border transition ${
+          className={`px-3 h-8 rounded-full flex items-center gap-1.5 text-xs font-bold border transition ${
             cloudUnlocked
               ? "bg-primary/20 text-primary border-primary/40"
               : "bg-secondary text-muted-foreground border-border"
           }`}
         >
-          🔑
+          <span aria-hidden>🔑</span>
+          <span>KEY</span>
         </button>
+        <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          IMEI Scanner
+        </h1>
+        <div className="w-[64px]" />
       </header>
 
       {/* Main content area */}
@@ -526,6 +537,65 @@ export function ImeiScanner() {
           badge={history.length || undefined}
         />
       </nav>
+
+      {pwPromptOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4"
+          onClick={() => setPwPromptOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span aria-hidden className="text-lg">🔑</span>
+              <h2 className="text-base font-bold text-foreground">Cloud history password</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Enter password to view shared cloud-synced history.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitPassword();
+              }}
+            >
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoFocus
+                autoComplete="off"
+                value={pwInput}
+                onChange={(e) => {
+                  setPwInput(e.target.value.replace(/[^0-9]/g, ""));
+                  if (pwError) setPwError("");
+                }}
+                placeholder="Password"
+                className="w-full h-12 px-4 rounded-xl bg-background border border-primary/60 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary text-base tracking-widest"
+              />
+              {pwError && (
+                <p className="mt-2 text-xs text-destructive">{pwError}</p>
+              )}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPwPromptOpen(false)}
+                  className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
