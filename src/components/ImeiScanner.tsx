@@ -86,6 +86,9 @@ export function ImeiScanner() {
   const [pwPromptOpen, setPwPromptOpen] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState("");
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameTarget, setRenameTarget] = useState<ScannedPair | null>(null);
 
   useEffect(() => {
     loadTacDb();
@@ -400,7 +403,7 @@ export function ImeiScanner() {
   };
 
   const addDeviceName = async (imei: string) => {
-    const name = window.prompt("Enter device name (e.g. XIAOMI Redmi 13)")?.trim();
+    const name = window.prompt("Enter Device Name")?.trim();
     if (!name) return;
     setStatus("Saving device name...");
     const ok = await saveDeviceOverride(imei, name);
@@ -461,18 +464,32 @@ export function ImeiScanner() {
     setTab("scanner");
   };
 
-  const renameCloudEntry = async (entry: ScannedPair) => {
-    const name = window.prompt("Rename device", entry.device || "")?.trim();
-    if (!name) return;
+  const openRenameModal = (entry: ScannedPair) => {
+    setRenameTarget(entry);
+    setRenameValue(entry.device || "");
+    setRenameOpen(true);
+  };
+
+  const submitRename = async () => {
+    if (!renameTarget || !renameValue.trim()) {
+      setRenameOpen(false);
+      setRenameTarget(null);
+      setRenameValue("");
+      return;
+    }
+    const name = renameValue.trim();
     setStatus("Renaming...");
-    // Persist permanently against the TAC (so future scans inherit the name)
-    const tac = entry.imei1.slice(0, 8);
+    const tac = renameTarget.imei1.slice(0, 8);
     const okTac = await saveDeviceOverride(tac, name);
-    // Update this scan row's device name directly
-    const okRow = await updateScanDevice(entry.id, name);
-    if (!okTac && !okRow) { setStatus("Rename failed"); return; }
-    setCloudHistory((rows) => rows.map((r) => (r.id === entry.id ? { ...r, device: name } : r)));
-    // Also reflect in local history when TAC matches
+    const okRow = await updateScanDevice(renameTarget.id, name);
+    if (!okTac && !okRow) {
+      setStatus("Rename failed");
+      setRenameOpen(false);
+      setRenameTarget(null);
+      setRenameValue("");
+      return;
+    }
+    setCloudHistory((rows) => rows.map((r) => (r.id === renameTarget.id ? { ...r, device: name } : r)));
     setHistory((h) =>
       h.map((e) =>
         e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
@@ -481,6 +498,9 @@ export function ImeiScanner() {
       ),
     );
     setStatus("Renamed ✓");
+    setRenameOpen(false);
+    setRenameTarget(null);
+    setRenameValue("");
   };
 
   const deleteCloudEntry = async (entry: ScannedPair) => {
@@ -553,7 +573,7 @@ export function ImeiScanner() {
             refresh={loadCloud}
             lock={lockCloud}
             copy={copy}
-            onRename={renameCloudEntry}
+            onRename={openRenameModal}
             onDelete={deleteCloudEntry}
           />
         )}
@@ -623,6 +643,54 @@ export function ImeiScanner() {
                   className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
                 >
                   Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {renameOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4"
+          onClick={() => setRenameOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold text-foreground mb-1">Rename Device</h2>
+            <p className="text-xs text-muted-foreground mb-4">Enter Device Name</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitRename();
+              }}
+            >
+              <input
+                type="text"
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="Enter Device Name"
+                className="w-full h-12 px-4 rounded-xl bg-background border border-primary/60 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary text-base"
+              />
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameOpen(false);
+                    setRenameTarget(null);
+                    setRenameValue("");
+                  }}
+                  className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Save
                 </button>
               </div>
             </form>
@@ -905,31 +973,38 @@ function CloudView(props: {
           const date = d.toLocaleString([], { month: "short", day: "2-digit" });
           return (
             <div key={h.id} className="glass overflow-hidden">
-              <div className="w-full flex items-center justify-between gap-2 px-3 py-2.5">
-                <button
-                  onClick={() => setExpanded(isOpen ? null : h.id)}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
+              <div className="w-full flex items-start justify-between gap-2 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRename(h); }}
+                      title="Rename device"
+                      className="text-[11px] w-6 h-6 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 shrink-0 flex items-center justify-center"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(h); }}
+                      title="Delete scan"
+                      className="text-[11px] w-6 h-6 rounded-md bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 shrink-0 flex items-center justify-center"
+                    >
+                      🗑
+                    </button>
+                  </div>
                   <div className="text-[11px] text-muted-foreground font-mono truncate">{date} · {time}</div>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onRename(h); }}
-                  title="Rename device"
-                  className="text-[11px] w-7 h-7 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 shrink-0"
-                >
-                  ✎
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(h); }}
-                  title="Delete scan"
-                  className="text-[11px] w-7 h-7 rounded-md bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 shrink-0"
-                >
-                  🗑
-                </button>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
-                  {count}
-                </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30">
+                    {count} IMEI{count !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    onClick={() => setExpanded(isOpen ? null : h.id)}
+                    className={`text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  >
+                    ⌄
+                  </button>
+                </div>
               </div>
               {isOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
