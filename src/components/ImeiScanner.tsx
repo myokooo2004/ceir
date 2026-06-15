@@ -573,7 +573,7 @@ export function ImeiScanner() {
             refresh={loadCloud}
             lock={lockCloud}
             copy={copy}
-            onRename={renameCloudEntry}
+            onRename={openRenameModal}
             onDelete={deleteCloudEntry}
           />
         )}
