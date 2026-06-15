@@ -86,6 +86,9 @@ export function ImeiScanner() {
   const [pwPromptOpen, setPwPromptOpen] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState("");
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameTarget, setRenameTarget] = useState<ScannedPair | null>(null);
 
   useEffect(() => {
     loadTacDb();
