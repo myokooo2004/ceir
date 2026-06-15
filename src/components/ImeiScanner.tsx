@@ -403,7 +403,7 @@ export function ImeiScanner() {
   };
 
   const addDeviceName = async (imei: string) => {
-    const name = window.prompt("Enter device name (e.g. XIAOMI Redmi 13)")?.trim();
+    const name = window.prompt("Enter Device Name")?.trim();
     if (!name) return;
     setStatus("Saving device name...");
     const ok = await saveDeviceOverride(imei, name);
