@@ -973,31 +973,38 @@ function CloudView(props: {
           const date = d.toLocaleString([], { month: "short", day: "2-digit" });
           return (
             <div key={h.id} className="glass overflow-hidden">
-              <div className="w-full flex items-center justify-between gap-2 px-3 py-2.5">
-                <button
-                  onClick={() => setExpanded(isOpen ? null : h.id)}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <div className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</div>
+              <div className="w-full flex items-start justify-between gap-2 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-semibold truncate">{h.device || `Scan ${time}`}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRename(h); }}
+                      title="Rename device"
+                      className="text-[11px] w-6 h-6 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 shrink-0 flex items-center justify-center"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(h); }}
+                      title="Delete scan"
+                      className="text-[11px] w-6 h-6 rounded-md bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 shrink-0 flex items-center justify-center"
+                    >
+                      🗑
+                    </button>
+                  </div>
                   <div className="text-[11px] text-muted-foreground font-mono truncate">{date} · {time}</div>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onRename(h); }}
-                  title="Rename device"
-                  className="text-[11px] w-7 h-7 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 shrink-0"
-                >
-                  ✎
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(h); }}
-                  title="Delete scan"
-                  className="text-[11px] w-7 h-7 rounded-md bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 shrink-0"
-                >
-                  🗑
-                </button>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30 shrink-0">
-                  {count}
-                </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/15 text-primary font-semibold border border-primary/30">
+                    {count} IMEI{count !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    onClick={() => setExpanded(isOpen ? null : h.id)}
+                    className={`text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  >
+                    ⌄
+                  </button>
+                </div>
               </div>
               {isOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
