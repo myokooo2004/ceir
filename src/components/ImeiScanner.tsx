@@ -464,18 +464,32 @@ export function ImeiScanner() {
     setTab("scanner");
   };
 
-  const renameCloudEntry = async (entry: ScannedPair) => {
-    const name = window.prompt("Rename device", entry.device || "")?.trim();
-    if (!name) return;
+  const openRenameModal = (entry: ScannedPair) => {
+    setRenameTarget(entry);
+    setRenameValue(entry.device || "");
+    setRenameOpen(true);
+  };
+
+  const submitRename = async () => {
+    if (!renameTarget || !renameValue.trim()) {
+      setRenameOpen(false);
+      setRenameTarget(null);
+      setRenameValue("");
+      return;
+    }
+    const name = renameValue.trim();
     setStatus("Renaming...");
-    // Persist permanently against the TAC (so future scans inherit the name)
-    const tac = entry.imei1.slice(0, 8);
+    const tac = renameTarget.imei1.slice(0, 8);
     const okTac = await saveDeviceOverride(tac, name);
-    // Update this scan row's device name directly
-    const okRow = await updateScanDevice(entry.id, name);
-    if (!okTac && !okRow) { setStatus("Rename failed"); return; }
-    setCloudHistory((rows) => rows.map((r) => (r.id === entry.id ? { ...r, device: name } : r)));
-    // Also reflect in local history when TAC matches
+    const okRow = await updateScanDevice(renameTarget.id, name);
+    if (!okTac && !okRow) {
+      setStatus("Rename failed");
+      setRenameOpen(false);
+      setRenameTarget(null);
+      setRenameValue("");
+      return;
+    }
+    setCloudHistory((rows) => rows.map((r) => (r.id === renameTarget.id ? { ...r, device: name } : r)));
     setHistory((h) =>
       h.map((e) =>
         e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
@@ -484,6 +498,9 @@ export function ImeiScanner() {
       ),
     );
     setStatus("Renamed ✓");
+    setRenameOpen(false);
+    setRenameTarget(null);
+    setRenameValue("");
   };
 
   const deleteCloudEntry = async (entry: ScannedPair) => {
