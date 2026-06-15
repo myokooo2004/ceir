@@ -649,6 +649,54 @@ export function ImeiScanner() {
           </div>
         </div>
       )}
+      {renameOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4"
+          onClick={() => setRenameOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold text-foreground mb-1">Rename Device</h2>
+            <p className="text-xs text-muted-foreground mb-4">Enter Device Name</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitRename();
+              }}
+            >
+              <input
+                type="text"
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="Enter Device Name"
+                className="w-full h-12 px-4 rounded-xl bg-background border border-primary/60 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary text-base"
+              />
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameOpen(false);
+                    setRenameTarget(null);
+                    setRenameValue("");
+                  }}
+                  className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
