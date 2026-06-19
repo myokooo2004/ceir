@@ -72,17 +72,21 @@ jobs:
           fi
           cat "$MANIFEST"
 
-      - name: Patch MainActivity to grant WebView camera permission
+      - name: Patch MainActivity to grant WebView camera + intent scheme
         run: |
           MA=$(find android/app/src/main/java -name "MainActivity.java" | head -n1)
           cat > "$MA" <<'EOF'
           package app.lovable.ceir;
 
+          import android.content.Intent;
+          import android.net.Uri;
           import android.os.Bundle;
           import android.Manifest;
           import android.content.pm.PackageManager;
           import android.webkit.PermissionRequest;
           import android.webkit.WebChromeClient;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
           import androidx.core.app.ActivityCompat;
           import com.getcapacitor.BridgeActivity;
 
@@ -96,11 +100,36 @@ jobs:
                       ActivityCompat.requestPermissions(this,
                           new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}, 1);
                   }
+                  WebView webView = this.bridge.getWebView();
                   // Grant camera to WebView (getUserMedia)
-                  this.bridge.getWebView().setWebChromeClient(new WebChromeClient() {
+                  webView.setWebChromeClient(new WebChromeClient() {
                       @Override
                       public void onPermissionRequest(final PermissionRequest request) {
                           runOnUiThread(() -> request.grant(request.getResources()));
+                      }
+                  });
+                  // Handle intent:// scheme for Lemur Browser
+                  webView.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                          if (url.startsWith("intent://")) {
+                              try {
+                                  Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                                  if (getPackageManager().resolveActivity(intent, 0) != null) {
+                                      startActivity(intent);
+                                  } else {
+                                      // Lemur not installed, open fallback URL
+                                      String fallback = intent.getStringExtra("browser_fallback_url");
+                                      if (fallback != null) {
+                                          startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(fallback)));
+                                      }
+                                  }
+                                  return true;
+                              } catch (Exception e) {
+                                  return false;
+                              }
+                          }
+                          return false;
                       }
                   });
               }
