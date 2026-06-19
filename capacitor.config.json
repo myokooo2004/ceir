@@ -8,10 +8,6 @@
     "androidScheme": "https"
   },
   "android": {
-    "allowMixedContent": false,
-    "allowNavigation": [
-      "ceir.gov.mm",
-      "intent://*"
-    ]
+    "allowMixedContent": false
   }
 }
