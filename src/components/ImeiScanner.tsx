@@ -800,6 +800,20 @@ function ScannerView(props: {
       >
         Check CEIR Status →
       </a>
+      <button
+        onClick={() => {
+          const url = "https://ceir.gov.mm/check-status";
+          const intentUrl = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.lemurbrowser.exts;end`;
+          try {
+            window.location.href = intentUrl;
+          } catch {
+            window.open(url, "_blank");
+          }
+        }}
+        className="w-full block text-center py-2.5 rounded-lg bg-secondary text-foreground font-bold text-sm hover:opacity-90 transition border border-border"
+      >
+        Open in Lemur Browser
+      </button>
     </div>
   );
 }
