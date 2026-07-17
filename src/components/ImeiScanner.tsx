@@ -406,16 +406,26 @@ export function ImeiScanner() {
     setExpanded(null);
   };
 
-  const addDeviceName = async (imei: string) => {
-    const name = window.prompt("Enter Device Name")?.trim();
-    if (!name) return;
+  const addDeviceName = (imei: string) => {
+    setAddNameImei(imei);
+    setAddNameValue("");
+    setAddNameOpen(true);
+  };
+
+  const submitAddName = async () => {
+    const name = addNameValue.trim();
+    const imei = addNameImei;
+    if (!name || !imei) {
+      setAddNameOpen(false);
+      return;
+    }
+    setAddNameOpen(false);
     setStatus("Saving device name...");
     const ok = await saveDeviceOverride(imei, name);
     if (!ok) {
       setStatus("Save failed");
       return;
     }
-    // Re-lookup all entries that share the same TAC
     const tac = imei.slice(0, 8);
     setHistory((h) =>
       h.map((e) =>
