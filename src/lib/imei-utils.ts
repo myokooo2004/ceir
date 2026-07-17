@@ -157,10 +157,10 @@ export function isValidImei(s: string): boolean {
 const IMEI_REGEX = /IMEI\s*([12])?\s*[:\-]?\s*(\d{15})/gi;
 
 export function extractImeisFromText(text: string): DetectedImei[] {
-  // Strip out any lines that look like ICCID — we don't want to capture SIM serials.
+  // Strip out any lines that look like ICCID or MEID — we don't want to capture SIM serials or CDMA MEIDs.
   const cleaned = text
     .split(/\r?\n/)
-    .filter((line) => !/ICCID/i.test(line))
+    .filter((line) => !/ICCID|MEID/i.test(line))
     .join("\n");
 
   const out: DetectedImei[] = [];
