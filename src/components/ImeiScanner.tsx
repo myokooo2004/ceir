@@ -89,6 +89,10 @@ export function ImeiScanner() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<ScannedPair | null>(null);
+  const [addNameOpen, setAddNameOpen] = useState(false);
+  const [addNameValue, setAddNameValue] = useState("");
+  const [addNameImei, setAddNameImei] = useState<string>("");
+  const [deleteTarget, setDeleteTarget] = useState<ScannedPair | null>(null);
 
   useEffect(() => {
     loadTacDb();
@@ -402,16 +406,26 @@ export function ImeiScanner() {
     setExpanded(null);
   };
 
-  const addDeviceName = async (imei: string) => {
-    const name = window.prompt("Enter Device Name")?.trim();
-    if (!name) return;
+  const addDeviceName = (imei: string) => {
+    setAddNameImei(imei);
+    setAddNameValue("");
+    setAddNameOpen(true);
+  };
+
+  const submitAddName = async () => {
+    const name = addNameValue.trim();
+    const imei = addNameImei;
+    if (!name || !imei) {
+      setAddNameOpen(false);
+      return;
+    }
+    setAddNameOpen(false);
     setStatus("Saving device name...");
     const ok = await saveDeviceOverride(imei, name);
     if (!ok) {
       setStatus("Save failed");
       return;
     }
-    // Re-lookup all entries that share the same TAC
     const tac = imei.slice(0, 8);
     setHistory((h) =>
       h.map((e) =>
@@ -503,8 +517,14 @@ export function ImeiScanner() {
     setRenameValue("");
   };
 
-  const deleteCloudEntry = async (entry: ScannedPair) => {
-    if (!window.confirm("Delete this scan from the shared database?")) return;
+  const deleteCloudEntry = (entry: ScannedPair) => {
+    setDeleteTarget(entry);
+  };
+
+  const confirmDeleteCloud = async () => {
+    const entry = deleteTarget;
+    if (!entry) return;
+    setDeleteTarget(null);
     setStatus("Deleting...");
     const ok = await deleteScan(entry.id);
     if (!ok) { setStatus("Delete failed"); return; }
@@ -694,6 +714,84 @@ export function ImeiScanner() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {addNameOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4"
+          onClick={() => setAddNameOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold text-foreground mb-1">Add Device Name</h2>
+            <p className="text-xs text-muted-foreground mb-4">Enter Device Name</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitAddName();
+              }}
+            >
+              <input
+                type="text"
+                autoFocus
+                value={addNameValue}
+                onChange={(e) => setAddNameValue(e.target.value)}
+                placeholder="Enter Device Name"
+                className="w-full h-12 px-4 rounded-xl bg-background border border-primary/60 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary text-base"
+              />
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAddNameOpen(false)}
+                  className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold text-foreground mb-1">Delete Scan</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Delete this scan from the shared database?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-muted-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteCloud}
+                className="flex-1 h-10 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
