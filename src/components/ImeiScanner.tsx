@@ -517,8 +517,14 @@ export function ImeiScanner() {
     setRenameValue("");
   };
 
-  const deleteCloudEntry = async (entry: ScannedPair) => {
-    if (!window.confirm("Delete this scan from the shared database?")) return;
+  const deleteCloudEntry = (entry: ScannedPair) => {
+    setDeleteTarget(entry);
+  };
+
+  const confirmDeleteCloud = async () => {
+    const entry = deleteTarget;
+    if (!entry) return;
+    setDeleteTarget(null);
     setStatus("Deleting...");
     const ok = await deleteScan(entry.id);
     if (!ok) { setStatus("Delete failed"); return; }
