@@ -89,6 +89,10 @@ export function ImeiScanner() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<ScannedPair | null>(null);
+  const [addNameOpen, setAddNameOpen] = useState(false);
+  const [addNameValue, setAddNameValue] = useState("");
+  const [addNameImei, setAddNameImei] = useState<string>("");
+  const [deleteTarget, setDeleteTarget] = useState<ScannedPair | null>(null);
 
   useEffect(() => {
     loadTacDb();
