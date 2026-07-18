@@ -99,6 +99,33 @@ export async function deleteScan(id: string): Promise<boolean> {
   return true;
 }
 
+// Update device name on every cloud scan row whose imei1 or imei2 starts with the given TAC.
+export async function updateCloudDevicesByTac(tac: string, name: string): Promise<number> {
+  const cleanTac = tac.slice(0, 8);
+  if (!/^\d{8}$/.test(cleanTac)) return 0;
+  try {
+    const { data, error } = await (supabase as any)
+      .from("scan_history")
+      .select("id,imei1,imei2")
+      .or(`imei1.like.${cleanTac}%,imei2.like.${cleanTac}%`);
+    if (error || !data) return 0;
+    const ids = data.map((r: any) => r.id);
+    if (!ids.length) return 0;
+    const { error: uErr } = await (supabase as any)
+      .from("scan_history")
+      .update({ device: name })
+      .in("id", ids);
+    if (uErr) {
+      console.error("updateCloudDevicesByTac update failed", uErr);
+      return 0;
+    }
+    return ids.length;
+  } catch (e) {
+    console.error("updateCloudDevicesByTac failed", e);
+    return 0;
+  }
+}
+
 export async function saveScanToCloud(pair: ScannedPair): Promise<void> {
   try {
     await (supabase as any).from("scan_history").insert({
