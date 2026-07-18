@@ -206,7 +206,7 @@ export function ImeiScanner() {
       console.error("OCR error", e);
     }
     if (runningRef.current) {
-      loopRef.current = window.setTimeout(ocrLoop, 600) as unknown as number;
+      loopRef.current = window.setTimeout(ocrLoop, 250) as unknown as number;
     }
   }, [grabFrame, handleDetected]);
 
