@@ -513,7 +513,17 @@ export function ImeiScanner() {
       setRenameValue("");
       return;
     }
-    setCloudHistory((rows) => rows.map((r) => (r.id === renameTarget.id ? { ...r, device: name } : r)));
+    // Propagate to every cloud row sharing the same TAC.
+    await updateCloudDevicesByTac(tac, name);
+    setCloudHistory((rows) =>
+      rows.map((r) =>
+        r.id === renameTarget.id ||
+        r.imei1.slice(0, 8) === tac ||
+        (r.imei2 && r.imei2.slice(0, 8) === tac)
+          ? { ...r, device: name }
+          : r,
+      ),
+    );
     setHistory((h) =>
       h.map((e) =>
         e.imei1.slice(0, 8) === tac || (e.imei2 && e.imei2.slice(0, 8) === tac)
