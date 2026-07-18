@@ -257,7 +257,7 @@ export function ImeiScanner() {
         if (!workerRef.current) {
           workerRef.current = await createWorker("eng");
           await workerRef.current.setParameters({
-            tessedit_char_whitelist: "IMEIimei0123456789:- ",
+            tessedit_char_whitelist: "IMEImei0123456789:- \n",
             // @ts-expect-error psm enum
             tessedit_pageseg_mode: "6",
           });
