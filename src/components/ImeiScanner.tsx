@@ -23,7 +23,7 @@ interface PendingCounts {
   [imei: string]: { count: number; slotHint?: 1 | 2 };
 }
 
-const STABILITY_THRESHOLD = 2;
+const STABILITY_THRESHOLD = 1;
 const HISTORY_KEY = "imei_scan_history_v1";
 // Password is never stored in plaintext in the bundle. We compare a salted,
 // 150k-iteration SHA-256 chain. Extracting the APK only reveals the hash —
@@ -206,7 +206,7 @@ export function ImeiScanner() {
       console.error("OCR error", e);
     }
     if (runningRef.current) {
-      loopRef.current = window.setTimeout(ocrLoop, 600) as unknown as number;
+      loopRef.current = window.setTimeout(ocrLoop, 250) as unknown as number;
     }
   }, [grabFrame, handleDetected]);
 
@@ -257,7 +257,7 @@ export function ImeiScanner() {
         if (!workerRef.current) {
           workerRef.current = await createWorker("eng");
           await workerRef.current.setParameters({
-            tessedit_char_whitelist: "IMEIimei0123456789:- ",
+            tessedit_char_whitelist: "IMEICDPSNVimeicdpsnv0123456789:- \n",
             // @ts-expect-error psm enum
             tessedit_pageseg_mode: "6",
           });
