@@ -23,7 +23,7 @@ interface PendingCounts {
   [imei: string]: { count: number; slotHint?: 1 | 2 };
 }
 
-const STABILITY_THRESHOLD = 2;
+const STABILITY_THRESHOLD = 1;
 const HISTORY_KEY = "imei_scan_history_v1";
 // Password is never stored in plaintext in the bundle. We compare a salted,
 // 150k-iteration SHA-256 chain. Extracting the APK only reveals the hash —
