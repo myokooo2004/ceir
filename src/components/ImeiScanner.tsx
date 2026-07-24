@@ -132,19 +132,29 @@ export function ImeiScanner() {
     const device = imei1 ? lookupDevice(imei1) : undefined;
     setCurrent({ imei1, imei2, device });
     if (imei1) {
+      const id = crypto.randomUUID();
       const entry: ScannedPair = {
-        id: crypto.randomUUID(),
+        id,
         imei1,
         imei2,
         device,
         date: new Date().toISOString(),
       };
       setHistory((h) => [entry, ...h]);
-      // Save to shared cloud database (no auth required)
       saveScanToCloud(entry);
-      // Record unknown TACs so they can be renamed permanently later
       ensureTacRecorded(imei1);
       if (imei2) ensureTacRecorded(imei2);
+      // Async fallback lookup against the cloud TAC database
+      if (!device) {
+        import("@/lib/imei-utils").then(({ lookupDeviceAsync, updateCloudDevicesByTac }) => {
+          lookupDeviceAsync(imei1!).then((name) => {
+            if (!name) return;
+            setCurrent((c) => (c && c.imei1 === imei1 ? { ...c, device: name } : c));
+            setHistory((h) => h.map((e) => (e.id === id ? { ...e, device: name } : e)));
+            updateCloudDevicesByTac(imei1!.slice(0, 8), name);
+          });
+        });
+      }
     }
   }, []);
 
