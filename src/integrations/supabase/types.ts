@@ -56,6 +56,24 @@ export type Database = {
         }
         Relationships: []
       }
+      tac_database: {
+        Row: {
+          brand: string | null
+          model: string | null
+          tac: string
+        }
+        Insert: {
+          brand?: string | null
+          model?: string | null
+          tac: string
+        }
+        Update: {
+          brand?: string | null
+          model?: string | null
+          tac?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
