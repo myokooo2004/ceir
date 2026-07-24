@@ -158,22 +158,52 @@ export async function fetchCloudHistory(): Promise<ScannedPair[]> {
   }));
 }
 
-export function lookupDevice(imei: string): string | undefined {
-  const tac = imei.slice(0, 8);
-  if (overrideCache[tac]) return overrideCache[tac];
-  if (!tacCache) return undefined;
-  const row = tacCache[tac] as any;
-  if (!row) return undefined;
-  const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
-  const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
-  const combined = [brand, model].filter(Boolean).join(" ").trim();
-  if (!combined) return undefined;
-  const words = combined.split(/\s+/);
+function dedupWords(s: string): string {
+  const words = s.split(/\s+/).filter(Boolean);
   const out: string[] = [];
   for (const w of words) {
     if (!out.length || out[out.length - 1].toLowerCase() !== w.toLowerCase()) out.push(w);
   }
   return out.join(" ");
+}
+
+const cloudTacCache: Record<string, string | null> = {};
+
+export function lookupDevice(imei: string): string | undefined {
+  const tac = imei.slice(0, 8);
+  if (overrideCache[tac]) return overrideCache[tac];
+  if (cloudTacCache[tac]) return cloudTacCache[tac] ?? undefined;
+  if (!tacCache) return undefined;
+  const row = tacCache[tac] as any;
+  if (!row) return undefined;
+  const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
+  const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
+  const combined = dedupWords([brand, model].filter(Boolean).join(" "));
+  return combined || undefined;
+}
+
+export async function lookupDeviceAsync(imei: string): Promise<string | undefined> {
+  const tac = imei.slice(0, 8);
+  const sync = lookupDevice(imei);
+  if (sync) return sync;
+  if (!/^\d{8}$/.test(tac)) return undefined;
+  if (tac in cloudTacCache) return cloudTacCache[tac] ?? undefined;
+  try {
+    const { data } = await (supabase as any)
+      .from("tac_database")
+      .select("brand,model")
+      .eq("tac", tac)
+      .maybeSingle();
+    if (data) {
+      const combined = dedupWords(`${data.brand ?? ""} ${data.model ?? ""}`.trim());
+      cloudTacCache[tac] = combined || null;
+      return combined || undefined;
+    }
+    cloudTacCache[tac] = null;
+  } catch (e) {
+    console.error("lookupDeviceAsync failed", e);
+  }
+  return undefined;
 }
 
 // Luhn check optional — keep permissive but verify length
