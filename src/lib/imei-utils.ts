@@ -17,6 +17,10 @@ const TAC_URL = "https://raw.githubusercontent.com/myokooo2004/tac-db/main/tac.j
 let tacCache: Record<string, { brand?: string; model?: string; name?: string }> | null = null;
 const overrideCache: Record<string, string> = {};
 
+function isPlaceholderName(name?: string | null): boolean {
+  return !name || /^unknown(\s+device)?$/i.test(name.trim());
+}
+
 export async function loadTacDb() {
   if (!tacCache) {
     try {
@@ -36,10 +40,15 @@ export async function loadTacDb() {
       tacCache = {};
     }
   }
-  // Load user-submitted overrides from Lovable Cloud
+  // Load user-submitted overrides from Lovable Cloud (skip placeholder rows so they
+  // never shadow a real name from the TAC database)
   try {
     const { data } = await (supabase as any).from("device_overrides").select("tac,name");
-    if (data) for (const row of data) overrideCache[row.tac] = row.name;
+    if (data)
+      for (const row of data) {
+        if (isPlaceholderName(row.name)) continue;
+        overrideCache[row.tac] = row.name;
+      }
   } catch {}
   return tacCache!;
 }
@@ -171,8 +180,8 @@ const cloudTacCache: Record<string, string | null> = {};
 
 export function lookupDevice(imei: string): string | undefined {
   const tac = imei.slice(0, 8);
-  if (overrideCache[tac]) return overrideCache[tac];
-  if (cloudTacCache[tac]) return cloudTacCache[tac] ?? undefined;
+  if (overrideCache[tac] && !isPlaceholderName(overrideCache[tac])) return overrideCache[tac];
+  if (cloudTacCache[tac] && !isPlaceholderName(cloudTacCache[tac])) return cloudTacCache[tac] ?? undefined;
   if (!tacCache) return undefined;
   const row = tacCache[tac] as any;
   if (!row) return undefined;
