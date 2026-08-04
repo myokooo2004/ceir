@@ -241,9 +241,9 @@ export function extractImeisFromText(text: string): DetectedImei[] {
     }
     kept.push(line);
   }
-  // Also mask any 16+ digit run (ICCIDs are 19-20 digits) so a 15-digit slice of it
-  // can never be mistaken for an IMEI.
-  const cleaned = kept.join("\n").replace(/\d[\d\s-]{15,}\d/g, (s) => (/\s|-/.test(s) ? s.replace(/\d/g, "#") : "#"));
+  // Also mask any unbroken 16+ digit run (ICCIDs are 19-20 digits) so a 15-digit
+  // slice of it can never be mistaken for an IMEI.
+  const cleaned = kept.join("\n").replace(/\d{16,}/g, "#");
 
 
   const out: DetectedImei[] = [];
