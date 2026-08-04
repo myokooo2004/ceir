@@ -180,8 +180,8 @@ const cloudTacCache: Record<string, string | null> = {};
 
 export function lookupDevice(imei: string): string | undefined {
   const tac = imei.slice(0, 8);
-  if (overrideCache[tac]) return overrideCache[tac];
-  if (cloudTacCache[tac]) return cloudTacCache[tac] ?? undefined;
+  if (overrideCache[tac] && !isPlaceholderName(overrideCache[tac])) return overrideCache[tac];
+  if (cloudTacCache[tac] && !isPlaceholderName(cloudTacCache[tac])) return cloudTacCache[tac] ?? undefined;
   if (!tacCache) return undefined;
   const row = tacCache[tac] as any;
   if (!row) return undefined;
