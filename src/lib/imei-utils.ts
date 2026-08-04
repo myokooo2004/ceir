@@ -36,10 +36,15 @@ export async function loadTacDb() {
       tacCache = {};
     }
   }
-  // Load user-submitted overrides from Lovable Cloud
+  // Load user-submitted overrides from Lovable Cloud (skip placeholder rows so they
+  // never shadow a real name from the TAC database)
   try {
     const { data } = await (supabase as any).from("device_overrides").select("tac,name");
-    if (data) for (const row of data) overrideCache[row.tac] = row.name;
+    if (data)
+      for (const row of data) {
+        if (isPlaceholderName(row.name)) continue;
+        overrideCache[row.tac] = row.name;
+      }
   } catch {}
   return tacCache!;
 }
