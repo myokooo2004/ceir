@@ -223,11 +223,28 @@ export function isValidImei(s: string): boolean {
 const IMEI_REGEX = /IMEI\s*([12])?\s*[:\-]?\s*(\d{15})/gi;
 
 export function extractImeisFromText(text: string): DetectedImei[] {
-  // Strip out any lines that look like ICCID / MEID / PSN / SN — we don't want to capture SIM serials, CDMA MEIDs, or product serial numbers.
-  const cleaned = text
-    .split(/\r?\n/)
-    .filter((line) => !/ICCID|MEID|PSN|\bS\/?N\b/i.test(line))
-    .join("\n");
+  // Drop lines that look like ICCID / MEID / PSN / SN — we never want SIM serials,
+  // CDMA MEIDs, or product serial numbers. If such a label line carries no digits,
+  // its value most likely wrapped to the next line, so drop that line too.
+  const rawLines = text.split(/\r?\n/);
+  const kept: string[] = [];
+  const LABEL = /ICCID|MEID|PSN|\bS\/?N\b/i;
+  let skipNext = false;
+  for (const line of rawLines) {
+    if (LABEL.test(line)) {
+      skipNext = !/\d/.test(line);
+      continue;
+    }
+    if (skipNext) {
+      skipNext = false;
+      if (/^\D*\d[\d\s-]*$/.test(line)) continue; // digits-only continuation of the label
+    }
+    kept.push(line);
+  }
+  // Also mask any unbroken 16+ digit run (ICCIDs are 19-20 digits) so a 15-digit
+  // slice of it can never be mistaken for an IMEI.
+  const cleaned = kept.join("\n").replace(/\d{16,}/g, "#");
+
 
   const out: DetectedImei[] = [];
   const seen = new Set<string>();
