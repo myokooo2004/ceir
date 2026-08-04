@@ -17,6 +17,10 @@ const TAC_URL = "https://raw.githubusercontent.com/myokooo2004/tac-db/main/tac.j
 let tacCache: Record<string, { brand?: string; model?: string; name?: string }> | null = null;
 const overrideCache: Record<string, string> = {};
 
+function isPlaceholderName(name?: string | null): boolean {
+  return !name || /^unknown(\s+device)?$/i.test(name.trim());
+}
+
 export async function loadTacDb() {
   if (!tacCache) {
     try {
