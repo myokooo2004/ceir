@@ -13,7 +13,7 @@ export interface DetectedImei {
   slotHint?: 1 | 2;
 }
 
-const TAC_URL = "https://raw.githubusercontent.com/myokooo2004/tac-db/main/tac.json";
+const TAC_URL = "https://raw.githubusercontent.com/myokooo2004/ceir/main/tac.json";
 let tacCache: Record<string, { brand?: string; model?: string; name?: string }> | null = null;
 const overrideCache: Record<string, string> = {};
 
