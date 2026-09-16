@@ -16,7 +16,7 @@ export interface DetectedImei {
 // -------------------------------------------------------------
 // 👇 ၁။ ဒီနေရာမှာ သင်၏ GitHub Token (ghp_xxxx) ကို ထည့်သွင်းပါ
 // -------------------------------------------------------------
-const DEFAULT_GITHUB_TOKEN = ""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"
+const DEFAULT_GITHUB_TOKEN = "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"
 
 const GITHUB_OWNER = "myokooo2004";
 const GITHUB_REPO = "ceir";
