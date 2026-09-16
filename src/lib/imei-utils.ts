@@ -13,10 +13,10 @@ export interface DetectedImei {
   slotHint?: 1 | 2;
 }
 
-// -------------------------------------------------------------
-// 👇 ၁။ ဒီနေရာမှာ သင်၏ GitHub Token (ghp_xxxx) ကို ထည့်သွင်းပါ
-// -------------------------------------------------------------
-const DEFAULT_GITHUB_TOKEN = "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"
+// =========================================================================
+// 👇 ၁။ ဒီနေရာမှာ သင်၏ GitHub Token (ghp_xxxx) ကို ထည့်ပါ
+// =========================================================================
+const DEFAULT_GITHUB_TOKEN = "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"; // <--- သင့် Token ကို ဒီနေရာမှာ ထည့်ပါ
 
 const GITHUB_OWNER = "myokooo2004";
 const GITHUB_REPO = "ceir";
@@ -25,12 +25,21 @@ const TAC_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO
 
 let tacCache: Record<string, { brand?: string; model?: string; name?: string }> | null = null;
 const overrideCache: Record<string, string> = {};
+const cloudTacCache: Record<string, string | null> = {};
 
 function isPlaceholderName(name?: string | null): boolean {
   return !name || /^unknown(\s+device)?$/i.test(name.trim());
 }
 
-// GitHub Token ရယူခြင်း (Code ထဲက token သို့မဟုတ် localStorage မှ)
+function dedupWords(s: string): string {
+  const words = s.split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const w of words) {
+    if (!out.length || out[out.length - 1].toLowerCase() !== w.toLowerCase()) out.push(w);
+  }
+  return out.join(" ");
+}
+
 export function getGithubToken(): string {
   if (DEFAULT_GITHUB_TOKEN && DEFAULT_GITHUB_TOKEN.trim()) {
     return DEFAULT_GITHUB_TOKEN.trim();
@@ -48,27 +57,33 @@ export function setGithubToken(token: string): void {
   } catch {}
 }
 
+/**
+ * TAC Database ကို GitHub မှ ဒေါင်းလုဒ်ဆွဲ၍ Memory ထဲ သိမ်းဆည်းခြင်း
+ */
 export async function loadTacDb() {
   if (!tacCache) {
     try {
       const res = await fetch(TAC_URL);
-      const json = await res.json();
-      if (Array.isArray(json)) {
-        const map: Record<string, any> = {};
-        for (const row of json) {
-          const tac = String(row.tac ?? row.TAC ?? row.Tac ?? "").slice(0, 8);
-          if (tac) map[tac] = row;
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          const map: Record<string, any> = {};
+          for (const row of json) {
+            const tac = String(row.tac ?? row.TAC ?? row.Tac ?? "").slice(0, 8);
+            if (tac) map[tac] = row;
+          }
+          tacCache = map;
+        } else {
+          tacCache = json as any;
         }
-        tacCache = map;
-      } else {
-        tacCache = json as any;
       }
-    } catch {
-      tacCache = {};
+    } catch (e) {
+      console.warn("TAC fetch error:", e);
+      if (!tacCache) tacCache = {};
     }
   }
 
-  // Load user-submitted overrides from Cloud
+  // Load user overrides from Supabase
   try {
     const { data } = await (supabase as any).from("device_overrides").select("tac,name");
     if (data) {
@@ -79,11 +94,14 @@ export async function loadTacDb() {
     }
   } catch {}
 
-  return tacCache!;
+  return tacCache || {};
 }
 
+// App စတင်ပွင့်ချိန်တွင် background ကနေ ကြိုတင် load လုပ်ထားခြင်း
+loadTacDb().catch(() => {});
+
 /**
- * GitHub ceir/tac.json ထဲသို့ TAC အသစ်နှင့် Device Name အသစ်ကို တိုက်ရိုက် Auto-Commit ပြုလုပ်ခြင်း
+ * GitHub ceir/tac.json ထဲသို့ TAC အသစ်နှင့် Device Name အသစ်ကို တိုက်ရိုက် Auto-Commit လုပ်မည့် function
  */
 export async function syncTacToGithubRepo(
   tac: string,
@@ -134,7 +152,7 @@ export async function syncTacToGithubRepo(
         tacData.unshift({ tac: cleanTac, brand: brandGuess, model: cleanName, name: cleanName });
       }
     } else if (typeof tacData === "object" && tacData !== null) {
-      // Key-Value Object format: { "10015000": { "brand": "...", "model": "..." } }
+      // Key-Value Object format: { "86908008": { "brand": "...", "model": "..." } }
       tacData[cleanTac] = {
         brand: brandGuess,
         model: cleanName,
@@ -171,14 +189,75 @@ export async function syncTacToGithubRepo(
 }
 
 /**
- * Device Override သိမ်းဆည်းခြင်း (Supabase ရော GitHub ပါ တစ်ပြိုင်နက်တည်း Auto-Save ပြုလုပ်ပေးပါသည်)
+ * IMEI ဖြင့် Device Name ရှာဖွေခြင်း (Synchronous)
+ */
+export function lookupDevice(imei: string): string | undefined {
+  const tac = imei.slice(0, 8);
+  if (overrideCache[tac] && !isPlaceholderName(overrideCache[tac])) return overrideCache[tac];
+  if (cloudTacCache[tac] && !isPlaceholderName(cloudTacCache[tac])) return cloudTacCache[tac] ?? undefined;
+  if (!tacCache) return undefined;
+
+  const row = tacCache[tac] as any;
+  if (!row) return undefined;
+
+  const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
+  const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
+  const combined = dedupWords([brand, model].filter(Boolean).join(" "));
+  return combined || undefined;
+}
+
+/**
+ * IMEI ဖြင့် Device Name ရှာဖွေခြင်း (Asynchronous - tacCache မပြီးသေးလျှင် စောင့်ပေးသည်)
+ */
+export async function lookupDeviceAsync(imei: string): Promise<string | undefined> {
+  const tac = imei.slice(0, 8);
+  if (!/^\d{8}$/.test(tac)) return undefined;
+
+  // ၁။ overrideCache မှာ အရင်စစ်ဆေးခြင်း
+  if (overrideCache[tac] && !isPlaceholderName(overrideCache[tac])) {
+    return overrideCache[tac];
+  }
+
+  // ၂။ tacCache မရှိသေးပါက loadTacDb ပြီးအောင် စောင့်ခြင်း
+  if (!tacCache || Object.keys(tacCache).length === 0) {
+    await loadTacDb();
+  }
+
+  // ၃။ tacCache ထဲမှ ရှာခြင်း
+  const sync = lookupDevice(imei);
+  if (sync) return sync;
+
+  if (tac in cloudTacCache) return cloudTacCache[tac] ?? undefined;
+
+  // ၄။ Supabase tac_database ထဲမှ ထပ်မံရှာခြင်း
+  try {
+    const { data } = await (supabase as any)
+      .from("tac_database")
+      .select("brand,model")
+      .eq("tac", tac)
+      .maybeSingle();
+    if (data) {
+      const combined = dedupWords(`${data.brand ?? ""} ${data.model ?? ""}`.trim());
+      cloudTacCache[tac] = combined || null;
+      return combined || undefined;
+    }
+    cloudTacCache[tac] = null;
+  } catch (e) {
+    console.error("lookupDeviceAsync error:", e);
+  }
+
+  return undefined;
+}
+
+/**
+ * Device Override အသစ် သတ်မှတ်သိမ်းဆည်းခြင်း (Supabase ရော GitHub ပါ တစ်ပြိုင်နက်တည်း Auto-Save လုပ်ပေးသည်)
  */
 export async function saveDeviceOverride(tac: string, name: string): Promise<boolean> {
   const cleanTac = tac.slice(0, 8);
   const cleanName = name.trim().slice(0, 100);
   if (!/^\d{8}$/.test(cleanTac) || !cleanName) return false;
 
-  // ၁။ Local Cache တွင် ချက်ချင်း အသုံးပြနိုင်အောင် ထည့်ခြင်း
+  // ၁။ Local Cache တွင် ချက်ချင်း အသုံးပြုနိုင်အောင် ထည့်ခြင်း
   overrideCache[cleanTac] = cleanName;
   if (tacCache) {
     tacCache[cleanTac] = {
@@ -203,7 +282,7 @@ export async function saveDeviceOverride(tac: string, name: string): Promise<boo
     sbSuccess = false;
   }
 
-  // ၃။ GitHub tac.json ထဲသို့ အလိုအလျောက် Auto-Save လှမ်းလုပ်ခြင်း
+  // ၃။ GitHub tac.json ထဲသို့ အလိုအလျောက် Auto-Commit လှမ်းလုပ်ခြင်း
   if (getGithubToken()) {
     syncTacToGithubRepo(cleanTac, cleanName).then((res) => {
       if (res.success) {
@@ -217,7 +296,7 @@ export async function saveDeviceOverride(tac: string, name: string): Promise<boo
   return sbSuccess;
 }
 
-// Record an unknown TAC into the cloud (placeholder name) so it can be renamed later.
+// Record an unknown TAC into the cloud
 export async function ensureTacRecorded(imei: string): Promise<void> {
   const tac = imei.slice(0, 8);
   if (!/^\d{8}$/.test(tac)) return;
@@ -257,7 +336,6 @@ export async function deleteScan(id: string): Promise<boolean> {
   return true;
 }
 
-// Update device name on every cloud scan row whose imei1 or imei2 starts with the given TAC.
 export async function updateCloudDevicesByTac(tac: string, name: string): Promise<number> {
   const cleanTac = tac.slice(0, 8);
   if (!/^\d{8}$/.test(cleanTac)) return 0;
@@ -274,7 +352,7 @@ export async function updateCloudDevicesByTac(tac: string, name: string): Promis
       .update({ device: name })
       .in("id", ids);
     if (uErr) {
-      console.error("updateCloudDevicesByTac update failed", uErr);
+      console.error("updateCloudDevicesByTac failed", uErr);
       return 0;
     }
     return ids.length;
@@ -316,54 +394,6 @@ export async function fetchCloudHistory(): Promise<ScannedPair[]> {
   }));
 }
 
-function dedupWords(s: string): string {
-  const words = s.split(/\s+/).filter(Boolean);
-  const out: string[] = [];
-  for (const w of words) {
-    if (!out.length || out[out.length - 1].toLowerCase() !== w.toLowerCase()) out.push(w);
-  }
-  return out.join(" ");
-}
-
-const cloudTacCache: Record<string, string | null> = {};
-
-export function lookupDevice(imei: string): string | undefined {
-  const tac = imei.slice(0, 8);
-  if (overrideCache[tac] && !isPlaceholderName(overrideCache[tac])) return overrideCache[tac];
-  if (cloudTacCache[tac] && !isPlaceholderName(cloudTacCache[tac])) return cloudTacCache[tac] ?? undefined;
-  if (!tacCache) return undefined;
-  const row = tacCache[tac] as any;
-  if (!row) return undefined;
-  const brand = String(row.brand ?? row.Brand ?? row.manufacturer ?? "").trim();
-  const model = String(row.model ?? row.Model ?? row.name ?? row.Name ?? "").trim();
-  const combined = dedupWords([brand, model].filter(Boolean).join(" "));
-  return combined || undefined;
-}
-
-export async function lookupDeviceAsync(imei: string): Promise<string | undefined> {
-  const tac = imei.slice(0, 8);
-  const sync = lookupDevice(imei);
-  if (sync) return sync;
-  if (!/^\d{8}$/.test(tac)) return undefined;
-  if (tac in cloudTacCache) return cloudTacCache[tac] ?? undefined;
-  try {
-    const { data } = await (supabase as any)
-      .from("tac_database")
-      .select("brand,model")
-      .eq("tac", tac)
-      .maybeSingle();
-    if (data) {
-      const combined = dedupWords(`${data.brand ?? ""} ${data.model ?? ""}`.trim());
-      cloudTacCache[tac] = combined || null;
-      return combined || undefined;
-    }
-    cloudTacCache[tac] = null;
-  } catch (e) {
-    console.error("lookupDeviceAsync failed", e);
-  }
-  return undefined;
-}
-
 export function isValidImei(s: string): boolean {
   return /^\d{15}$/.test(s);
 }
@@ -386,6 +416,7 @@ export function extractImeisFromText(text: string): DetectedImei[] {
     }
     kept.push(line);
   }
+
   const cleaned = kept.join("\n").replace(/\d{16,}/g, "#");
 
   const out: DetectedImei[] = [];
