@@ -13,12 +13,39 @@ export interface DetectedImei {
   slotHint?: 1 | 2;
 }
 
-const TAC_URL = "https://raw.githubusercontent.com/myokooo2004/ceir/main/tac.json";
+// -------------------------------------------------------------
+// 👇 ၁။ ဒီနေရာမှာ သင်၏ GitHub Token (ghp_xxxx) ကို ထည့်သွင်းပါ
+// -------------------------------------------------------------
+const DEFAULT_GITHUB_TOKEN = ""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"
+
+const GITHUB_OWNER = "myokooo2004";
+const GITHUB_REPO = "ceir";
+const GITHUB_FILE = "tac.json";
+const TAC_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${GITHUB_FILE}`;
+
 let tacCache: Record<string, { brand?: string; model?: string; name?: string }> | null = null;
 const overrideCache: Record<string, string> = {};
 
 function isPlaceholderName(name?: string | null): boolean {
   return !name || /^unknown(\s+device)?$/i.test(name.trim());
+}
+
+// GitHub Token ရယူခြင်း (Code ထဲက token သို့မဟုတ် localStorage မှ)
+export function getGithubToken(): string {
+  if (DEFAULT_GITHUB_TOKEN && DEFAULT_GITHUB_TOKEN.trim()) {
+    return DEFAULT_GITHUB_TOKEN.trim();
+  }
+  try {
+    return localStorage.getItem("github_token") || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setGithubToken(token: string): void {
+  try {
+    localStorage.setItem("github_token", token.trim());
+  } catch {}
 }
 
 export async function loadTacDb() {
@@ -40,32 +67,154 @@ export async function loadTacDb() {
       tacCache = {};
     }
   }
-  // Load user-submitted overrides from Lovable Cloud (skip placeholder rows so they
-  // never shadow a real name from the TAC database)
+
+  // Load user-submitted overrides from Cloud
   try {
     const { data } = await (supabase as any).from("device_overrides").select("tac,name");
-    if (data)
+    if (data) {
       for (const row of data) {
         if (isPlaceholderName(row.name)) continue;
         overrideCache[row.tac] = row.name;
       }
+    }
   } catch {}
+
   return tacCache!;
 }
 
+/**
+ * GitHub ceir/tac.json ထဲသို့ TAC အသစ်နှင့် Device Name အသစ်ကို တိုက်ရိုက် Auto-Commit ပြုလုပ်ခြင်း
+ */
+export async function syncTacToGithubRepo(
+  tac: string,
+  deviceName: string,
+  customToken?: string
+): Promise<{ success: boolean; message: string }> {
+  const cleanTac = tac.slice(0, 8);
+  const cleanName = deviceName.trim();
+  const token = (customToken || getGithubToken()).trim();
+
+  if (!token) {
+    return { success: false, message: "GitHub Token မရှိသေးပါ" };
+  }
+
+  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
+
+  try {
+    // ၁။ လက်ရှိ tac.json ဖိုင်၏ metadata နှင့် sha ကို GitHub မှ လှမ်းယူခြင်း
+    const getRes = await fetch(apiUrl, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!getRes.ok) {
+      return {
+        success: false,
+        message: `GitHub ဖိုင်ရယူ၍ မရပါ (HTTP ${getRes.status})`,
+      };
+    }
+
+    const fileMeta = await getRes.json();
+    const currentSha = fileMeta.sha;
+
+    // Base64 decode ပြုလုပ်ခြင်း (UTF-8 safe)
+    const rawUtf8 = decodeURIComponent(escape(atob(fileMeta.content.replace(/\s/g, ""))));
+    let tacData = JSON.parse(rawUtf8);
+
+    // ၂။ TAC အသစ်ကို data ထဲ ပေါင်းထည့်ခြင်း
+    const brandGuess = cleanName.split(" ")[0] || "";
+
+    if (Array.isArray(tacData)) {
+      const idx = tacData.findIndex((x) => String(x.tac).slice(0, 8) === cleanTac);
+      if (idx >= 0) {
+        tacData[idx] = { ...tacData[idx], brand: brandGuess, model: cleanName, name: cleanName };
+      } else {
+        tacData.unshift({ tac: cleanTac, brand: brandGuess, model: cleanName, name: cleanName });
+      }
+    } else if (typeof tacData === "object" && tacData !== null) {
+      // Key-Value Object format: { "10015000": { "brand": "...", "model": "..." } }
+      tacData[cleanTac] = {
+        brand: brandGuess,
+        model: cleanName,
+      };
+    }
+
+    // ၃။ UTF-8 Base64 encode ပြန်လည်ပြုလုပ်ခြင်း
+    const updatedBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(tacData, null, 2))));
+
+    // ၄။ GitHub သို့ အလိုအလျောက် Commit လုပ်ခြင်း
+    const putRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: `Add TAC ${cleanTac}: ${cleanName}`,
+        content: updatedBase64,
+        sha: currentSha,
+      }),
+    });
+
+    if (putRes.ok) {
+      return { success: true, message: `TAC ${cleanTac} ကို GitHub tac.json ထဲသို့ Auto-Save အောင်မြင်ပါပြီ!` };
+    } else {
+      const err = await putRes.json().catch(() => ({}));
+      return { success: false, message: err.message || "GitHub Commit မအောင်မြင်ပါ" };
+    }
+  } catch (err: any) {
+    return { success: false, message: err?.message || "Error ဖြစ်ပွားခဲ့သည်" };
+  }
+}
+
+/**
+ * Device Override သိမ်းဆည်းခြင်း (Supabase ရော GitHub ပါ တစ်ပြိုင်နက်တည်း Auto-Save ပြုလုပ်ပေးပါသည်)
+ */
 export async function saveDeviceOverride(tac: string, name: string): Promise<boolean> {
   const cleanTac = tac.slice(0, 8);
   const cleanName = name.trim().slice(0, 100);
   if (!/^\d{8}$/.test(cleanTac) || !cleanName) return false;
-  const { error } = await (supabase as any)
-    .from("device_overrides")
-    .upsert({ tac: cleanTac, name: cleanName }, { onConflict: "tac" });
-  if (error) {
-    console.error("saveDeviceOverride failed", error);
-    return false;
-  }
+
+  // ၁။ Local Cache တွင် ချက်ချင်း အသုံးပြနိုင်အောင် ထည့်ခြင်း
   overrideCache[cleanTac] = cleanName;
-  return true;
+  if (tacCache) {
+    tacCache[cleanTac] = {
+      brand: cleanName.split(" ")[0] || "",
+      model: cleanName,
+      name: cleanName,
+    };
+  }
+
+  // ၂။ Supabase Database တွင် သိမ်းဆည်းခြင်း
+  let sbSuccess = true;
+  try {
+    const { error } = await (supabase as any)
+      .from("device_overrides")
+      .upsert({ tac: cleanTac, name: cleanName }, { onConflict: "tac" });
+    if (error) {
+      console.error("saveDeviceOverride supabase error:", error);
+      sbSuccess = false;
+    }
+  } catch (e) {
+    console.error("saveDeviceOverride error:", e);
+    sbSuccess = false;
+  }
+
+  // ၃။ GitHub tac.json ထဲသို့ အလိုအလျောက် Auto-Save လှမ်းလုပ်ခြင်း
+  if (getGithubToken()) {
+    syncTacToGithubRepo(cleanTac, cleanName).then((res) => {
+      if (res.success) {
+        console.log("GitHub Auto-Save Success:", res.message);
+      } else {
+        console.warn("GitHub Auto-Save Warn:", res.message);
+      }
+    });
+  }
+
+  return sbSuccess;
 }
 
 // Record an unknown TAC into the cloud (placeholder name) so it can be renamed later.
@@ -215,7 +364,6 @@ export async function lookupDeviceAsync(imei: string): Promise<string | undefine
   return undefined;
 }
 
-// Luhn check optional — keep permissive but verify length
 export function isValidImei(s: string): boolean {
   return /^\d{15}$/.test(s);
 }
@@ -223,9 +371,6 @@ export function isValidImei(s: string): boolean {
 const IMEI_REGEX = /IMEI\s*([12])?\s*[:\-]?\s*(\d{15})/gi;
 
 export function extractImeisFromText(text: string): DetectedImei[] {
-  // Drop lines that look like ICCID / MEID / PSN / SN — we never want SIM serials,
-  // CDMA MEIDs, or product serial numbers. If such a label line carries no digits,
-  // its value most likely wrapped to the next line, so drop that line too.
   const rawLines = text.split(/\r?\n/);
   const kept: string[] = [];
   const LABEL = /ICCID|MEID|PSN|\bS\/?N\b/i;
@@ -237,14 +382,11 @@ export function extractImeisFromText(text: string): DetectedImei[] {
     }
     if (skipNext) {
       skipNext = false;
-      if (/^\D*\d[\d\s-]*$/.test(line)) continue; // digits-only continuation of the label
+      if (/^\D*\d[\d\s-]*$/.test(line)) continue;
     }
     kept.push(line);
   }
-  // Also mask any unbroken 16+ digit run (ICCIDs are 19-20 digits) so a 15-digit
-  // slice of it can never be mistaken for an IMEI.
   const cleaned = kept.join("\n").replace(/\d{16,}/g, "#");
-
 
   const out: DetectedImei[] = [];
   const seen = new Set<string>();
@@ -256,7 +398,7 @@ export function extractImeisFromText(text: string): DetectedImei[] {
     seen.add(v);
     out.push({ value: v, slotHint: m[1] ? (Number(m[1]) as 1 | 2) : undefined });
   }
-  // fallback: any standalone 15-digit run (word boundary excludes 19–20 digit ICCIDs)
+
   if (out.length === 0) {
     const re = /\b(\d{15})\b/g;
     let mm;
